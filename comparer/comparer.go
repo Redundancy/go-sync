@@ -5,6 +5,7 @@ to move through a file and compare it to the index, producing a FileDiffSummary
 package comparer
 
 import (
+	"fmt"
 	"github.com/Redundancy/go-sync/circularbuffer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/index"
@@ -100,7 +101,9 @@ func findMatchingBlocks_int(
 	_, err = io.ReadFull(comparison, block)
 
 	if err != nil {
-		ReportErr(err)
+		ReportErr(
+			fmt.Errorf("Error reading first block in comparison: %v", err),
+		)
 		return
 	}
 
@@ -117,6 +120,7 @@ func findMatchingBlocks_int(
 	i := int64(0)
 	next := READ_NEXT_BYTE
 
+	//ReadLoop:
 	for err == nil {
 		// look for a weak match
 		generator.WeakRollingHash.GetSum(weaksum)
@@ -152,10 +156,15 @@ func findMatchingBlocks_int(
 			i += 1
 		case READ_NEXT_BLOCK:
 			_, err = io.ReadFull(comparison, block)
-			generator.WeakRollingHash.SetBlock(block)
-			blockMemory.WriteEvicted(block)
-			i += int64(generator.BlockSize)
 
+			if err == nil {
+				generator.WeakRollingHash.SetBlock(block)
+				blockMemory.WriteEvicted(block)
+				i += int64(generator.BlockSize)
+			} else if err == io.EOF || err == io.ErrUnexpectedEOF {
+				err = io.EOF
+				break
+			}
 			// Reset to reading bytes
 			next = READ_NEXT_BYTE
 		}
