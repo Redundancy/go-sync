@@ -169,3 +169,23 @@ func BenchmarkMD5WithoutClear(b *testing.B) {
 	}
 	b.StopTimer()
 }
+
+// This is the benchmark where Rollsum should beat a full MD5 for each blocksize
+func BenchmarkIncrementalRollsum(b *testing.B) {
+	r := NewRollsum16(100)
+	buffer := make([]byte, 100)
+	r.Write(buffer)
+
+	b.ReportAllocs()
+	checksum := make([]byte, 16)
+	increment := make([]byte, 1)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		r.Write(increment)
+		r.Sum(checksum)
+		checksum = checksum[:0]
+	}
+	b.StopTimer()
+
+}
