@@ -12,6 +12,7 @@ However, in working with these libraries, I've found that they have limitations:
 * They don't allow incremental updates of directory / zip payloads based on what has changed
 * They don't seem to deal with the issue of the tcp bandwidth latency product (see various projects that put UDP underneath)
 * HTTP 1.1 support (ranged requests) can still be problematic to end-users
+* It's not written to be easily extensible and modifiable for varied uses
 
 I'm not interested in writing a fair UDP file transfer protocol (some companies make a lot of money doing that with WAN optimizers). I am interested in getting updates for big files from A to [B, C, D, ...] across a latent connection as fast as possible, where IOPS and CPU on either end are more economically available than a huge fat pipe and moving the whole lot every time on multiple connections.
 
@@ -37,4 +38,3 @@ I'm incrementally removing the current circular buffer, in favour of trying to d
 Note that while the Rollsum16 is only slightly more efficient than MD5 on the benchmark, it should blow it out of the water for byte by byte increments, but is currently 184 ns/op vs 311 ns/op, mostly due to to the circular buffer cost, which also allocates 16b for each byte written.
 
 I expect a lot of structural changes as I feel out the shape of things and try and make sure that the direction of dependencies etc makes sense. This isn't currently in a usable state.
-

@@ -112,7 +112,7 @@ func findMatchingBlocks_int(
 	weaksum := make([]byte, generator.WeakRollingHash.Size())
 	strongSum := make([]byte, 0, generator.GetStrongHash().Size())
 
-	blockMemory := circularbuffer.NewCircularBuffer(int64(generator.BlockSize))
+	blockMemory := circularbuffer.MakeC2Buffer(int(generator.BlockSize))
 	blockMemory.Write(block)
 
 	strong := generator.GetStrongHash()
@@ -126,7 +126,7 @@ func findMatchingBlocks_int(
 		generator.WeakRollingHash.GetSum(weaksum)
 		if weakMatchList := reference.FindWeakChecksumInIndex(weaksum); weakMatchList != nil {
 
-			block = blockMemory.GetLastBlock()
+			block = blockMemory.GetBlock()
 
 			strong.Reset()
 			strong.Write(block)
@@ -151,15 +151,15 @@ func findMatchingBlocks_int(
 		case READ_NEXT_BYTE:
 			_, err = comparison.Read(singleByte)
 			generator.WeakRollingHash.AddBytes(singleByte)
-			out := blockMemory.WriteEvicted(singleByte)
-			generator.WeakRollingHash.RemoveBytes(out)
+			blockMemory.Write(singleByte)
+			generator.WeakRollingHash.RemoveBytes(blockMemory.Evicted())
 			i += 1
 		case READ_NEXT_BLOCK:
 			_, err = io.ReadFull(comparison, block)
 
 			if err == nil {
 				generator.WeakRollingHash.SetBlock(block)
-				blockMemory.WriteEvicted(block)
+				blockMemory.Write(block)
 				i += int64(generator.BlockSize)
 			} else if err == io.EOF || err == io.ErrUnexpectedEOF {
 				err = io.EOF

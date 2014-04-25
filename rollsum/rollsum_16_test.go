@@ -3,6 +3,7 @@ package rollsum
 import (
 	"bytes"
 	"crypto/md5"
+	"github.com/Redundancy/go-sync/circularbuffer"
 	"hash"
 	"io"
 	"testing"
@@ -187,5 +188,29 @@ func BenchmarkIncrementalRollsum(b *testing.B) {
 		checksum = checksum[:0]
 	}
 	b.StopTimer()
+}
 
+// The C2 veersion should avoid all allocations in the main loop, and beat the pants off the
+// other versions
+func BenchmarkIncrementalRollsumWithC2(b *testing.B) {
+	const BLOCK_SIZE = 100
+	r := NewRollsum16Base(BLOCK_SIZE)
+	buffer := make([]byte, BLOCK_SIZE)
+	cbuffer := circularbuffer.MakeC2Buffer(BLOCK_SIZE)
+
+	r.AddBytes(buffer)
+	cbuffer.Write(buffer)
+
+	b.ReportAllocs()
+	checksum := make([]byte, 16)
+	increment := make([]byte, 1)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		r.AddBytes(increment)
+		cbuffer.Write(increment)
+		r.RemoveBytes(cbuffer.Evicted())
+		r.GetSum(checksum)
+	}
+	b.StopTimer()
 }
