@@ -13,6 +13,7 @@ import (
 // an index to work, but don't want to construct one by hand in order to avoid the dependencies
 // obviously this means that those tests are likely to fail if there are issues with any of the other
 // modules, which is not ideal.
+// TODO: move to util?
 func BuildChecksumIndex(check *filechecksum.FileChecksumGenerator, r io.Reader) (
 	fcheck []byte,
 	i *index.ChecksumIndex,

@@ -55,8 +55,26 @@ func Example() {
 		)
 	}
 
+	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount))
+
+	for _, missingRange := range missingBlockRanges {
+		referenceStart := missingRange.StartBlock * BLOCK_SIZE
+		referenceEnd := (missingRange.EndBlock + 1) * BLOCK_SIZE
+
+		if referenceEnd > uint(len(REFERENCE)) {
+			referenceEnd = uint(len(REFERENCE))
+		}
+
+		fmt.Printf(
+			"Missing: \"%v\"\n",
+			REFERENCE[referenceStart:referenceEnd],
+		)
+	}
+
 	// Output:
 	// Match: "The "
 	// Match: "k brown fox jump"
 	// Match: "the lazy dog"
+	// Missing: "quic"
+	// Missing: "ed over "
 }

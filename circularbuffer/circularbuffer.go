@@ -7,23 +7,18 @@ Getting the buffer will return a []byte of the current contents
 Note that the implementation actually needs to be optimized for two seperate use cases:
 
 1) During index generation, we reliably write BLOCK_SIZE chunks every time.
-In this case, we don't care about evicted bytes, and we never need to look at the buffer.
+In this case, we don't care about evicted bytes, and we never need to look at the buffer - so don't use any storage in this case
 
 2) While comparing, we frequently write a single byte and need to know the evicted byte.
 We infrequently may write a whole block and not need to know the evicted bytes. We also infrequently need the whole buffer.
 
-Note that in both of these cases, allocation is probably our enemy, but they can potentially be handled with different schemes.
-
-(2) can potentially be optimimized with an interface for writing a single byte and getting a single one back.
-That avoids constructing a slice to pass around a byte. Giving back a contiguous slice of the last BLOCK_SIZE bytes is more
-complex to do without allocation, but could potentially be done by having two double-size byte buffers, and writing into them
-with one having an offset of BLOCK_SIZE/2 to the other. When you need the buffer, check which one has its head > BLOCK_SIZE/2,
-implying that the content is not split across the buffer boundary, and return a slice pointing into that.
-
+This is the case that the C2 buffer is optimized for, as it will not do any allocation during this
 */
 package circularbuffer
 
 /*
+DEPRECATED
+
 This is a basic circular buffer of bytes. Once you have written the full buffer size
 you start to overwrite old values. In order to allow it to be used for a rolling checksum,
 it also returns the bytes that are evicted by writing a new value.
@@ -37,6 +32,7 @@ type CircularBuffer struct {
 	startOffset int
 }
 
+// DEPRECATED
 func NewCircularBuffer(size int64) *CircularBuffer {
 	return &CircularBuffer{
 		buffer:      make([]byte, 0, size),

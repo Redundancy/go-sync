@@ -32,9 +32,8 @@ Ideas for extensions or usage could include:
 ### Current State
 
 It's currently capable of identifying identical sections of files (see gosync_test.go for an example). Based on this, it should be relatively easy to ask for different sections and produce a new version of the file based on the combined images.
+The new C2 circular buffer implementation is profiling fairly well, with no allocations in the heavy loops and decent performance compared to running md5 on every block.
 
-I'm incrementally removing the current circular buffer, in favour of trying to do something a little faster but less memory efficient (a pair of offset buffers twice the block size) allowing a contiguous slice to be generated from one of them at any time.
-
-Note that while the Rollsum16 is only slightly more efficient than MD5 on the benchmark, it should blow it out of the water for byte by byte increments, but is currently 184 ns/op vs 311 ns/op, mostly due to to the circular buffer cost, which also allocates 16b for each byte written.
+The next job is to finish off the remaining logic required to take the pieces you already have, a source for the bits you don't, and a place to write the result, to actually reconstruct the reference file.
 
 I expect a lot of structural changes as I feel out the shape of things and try and make sure that the direction of dependencies etc makes sense. This isn't currently in a usable state.

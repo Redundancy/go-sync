@@ -15,6 +15,7 @@ import (
 )
 
 type ChecksumIndex struct {
+	BlockCount int
 	// Find a matching weak checksum, see if there's a matching strong checksum
 	weakChecksumLookup map[string]StrongChecksumList
 }
@@ -23,6 +24,7 @@ type ChecksumIndex struct {
 // We use this for the
 func MakeChecksumIndex(checksums []chunks.ChunkChecksum) *ChecksumIndex {
 	n := &ChecksumIndex{
+		BlockCount:         len(checksums),
 		weakChecksumLookup: make(map[string]StrongChecksumList, len(checksums)),
 	}
 

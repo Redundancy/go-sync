@@ -153,3 +153,26 @@ func (merger *MatchMerger) GetMergedBlocks() (sorted BlockSpanList) {
 	sort.Sort(sorted)
 	return
 }
+
+// Creates a list of spans that are missing.
+func (l BlockSpanList) GetMissingBlocks(maxBlock uint) (sorted BlockSpanList) {
+	// it's difficult to know how many spans we will need
+	sorted = make(BlockSpanList, 0, maxBlock/4)
+
+	lastBlockSpanIndex := -1
+	for _, blockSpan := range l {
+		if int(blockSpan.StartBlock) > lastBlockSpanIndex+1 {
+			sorted = append(
+				sorted,
+				BlockSpan{
+					StartBlock: uint(lastBlockSpanIndex + 1),
+					EndBlock:   blockSpan.StartBlock - 1,
+				},
+			)
+		}
+
+		lastBlockSpanIndex = int(blockSpan.EndBlock)
+	}
+
+	return sorted
+}
