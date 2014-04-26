@@ -107,12 +107,8 @@ func (check *FileChecksumGenerator) GenerateChecksums(inputFile io.Reader, outpu
 		n, err := io.ReadFull(inputFile, buffer)
 		section := buffer[:n]
 
-		if err != nil {
-			if err != io.EOF {
-				return nil, err
-			} else {
-				break
-			}
+		if n == 0 {
+			break
 		}
 
 		// As hashes, the assumption is that they never error

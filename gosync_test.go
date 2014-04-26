@@ -17,7 +17,7 @@ func Example() {
 	const REFERENCE = "The quick brown fox jumped over the lazy dog"
 
 	// This is what we have locally. Not too far off, but not correct.
-	const LOCAL_VERSION = "The qwik brown fox jumped 0v3r the lazy dog"
+	const LOCAL_VERSION = "The qwik brown fox jumped 0v3r the lazy"
 
 	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
 
@@ -77,4 +77,5 @@ func Example() {
 	// Match: "the lazy dog"
 	// Missing: "quic"
 	// Missing: "ed over "
+	// Missing: " dog"
 }

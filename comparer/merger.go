@@ -174,5 +174,15 @@ func (l BlockSpanList) GetMissingBlocks(maxBlock uint) (sorted BlockSpanList) {
 		lastBlockSpanIndex = int(blockSpan.EndBlock)
 	}
 
+	if uint(lastBlockSpanIndex) < maxBlock {
+		sorted = append(
+			sorted,
+			BlockSpan{
+				StartBlock: uint(lastBlockSpanIndex + 1),
+				EndBlock:   maxBlock,
+			},
+		)
+	}
+
 	return sorted
 }

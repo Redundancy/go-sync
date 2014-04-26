@@ -38,6 +38,35 @@ func TestRollsumLength(t *testing.T) {
 	}
 }
 
+func TestRollsumLengthWithPartialBlockAtEnd(t *testing.T) {
+	const BLOCKSIZE = 100
+	const FULL_BLOCK_COUNT = 20
+	const BLOCK_COUNT = FULL_BLOCK_COUNT + 1
+
+	emptybuffer := bytes.NewBuffer(make([]byte, FULL_BLOCK_COUNT*BLOCKSIZE+50))
+	output := bytes.NewBuffer(nil)
+
+	checksum := NewFileChecksumGenerator(BLOCKSIZE)
+
+	// output length is expected to be 20 blocks
+	expectedLength := (BLOCK_COUNT * checksum.GetStrongHash().Size()) +
+		(BLOCK_COUNT * checksum.WeakRollingHash.Size())
+
+	_, err := checksum.GenerateChecksums(emptybuffer, output)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if output.Len() != expectedLength {
+		t.Errorf(
+			"output length (%v) did not match expected length (%v)",
+			output.Len(),
+			expectedLength,
+		)
+	}
+}
+
 // Each of the data blocks is the same, so the checksums for the blocks should be the same
 func TestChecksumBlocksTheSame(t *testing.T) {
 	const BLOCKSIZE = 100
