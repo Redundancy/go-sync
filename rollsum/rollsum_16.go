@@ -6,6 +6,7 @@ The implementation of Rollsum16 is not used internally, but is provided for conv
 completeness. The internal implementations rely on Rollsum16Base, which provides only the
 hashing mechanics without the storage, and allows the implementation to be optimized by usage.
 
+TODO: Port over to the C2 circular buffer so that performance isn't totally sucky
 */
 package rollsum
 

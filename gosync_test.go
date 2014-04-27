@@ -6,7 +6,35 @@ import (
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/indexbuilder"
+	"github.com/Redundancy/go-sync/patcher"
+	"github.com/Redundancy/go-sync/patcher/sequential"
+	"github.com/Redundancy/go-sync/util/blocksources"
 )
+
+func ToPatcherFoundSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.FoundBlockSpan {
+	result := make([]patcher.FoundBlockSpan, len(sl))
+
+	for i, v := range sl {
+		result[i].StartBlock = v.StartBlock
+		result[i].EndBlock = v.EndBlock
+		result[i].MatchOffset = v.ComparisonStartOffset
+		result[i].BlockSize = blockSize
+	}
+
+	return result
+}
+
+func ToPatcherMissingSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.MissingBlockSpan {
+	result := make([]patcher.MissingBlockSpan, len(sl))
+
+	for i, v := range sl {
+		result[i].StartBlock = v.StartBlock
+		result[i].EndBlock = v.EndBlock
+		result[i].BlockSize = blockSize
+	}
+
+	return result
+}
 
 func Example() {
 	// due to short example strings, use a very small block size
@@ -71,11 +99,34 @@ func Example() {
 		)
 	}
 
+	// the "file" to write to
+	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
+	remoteReferenceSource := blocksources.NewByteBlockSource([]byte(REFERENCE))
+
+	err = sequential.SequentialPatcher(
+		bytes.NewReader([]byte(LOCAL_VERSION)),
+		remoteReferenceSource,
+		ToPatcherMissingSpan(missingBlockRanges, BLOCK_SIZE),
+		ToPatcherFoundSpan(matchingBlockRanges, BLOCK_SIZE),
+		1024,
+		patchedFile,
+	)
+
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("Patched result: \"%s\"\n", patchedFile.Bytes())
+	fmt.Println("Remotely requested bytes:", remoteReferenceSource.ReadBytes(), "(without the index!)")
+	fmt.Println("Full file length:", len(REFERENCE), "bytes")
 	// Output:
 	// Match: "The "
 	// Match: "k brown fox jump"
-	// Match: "the lazy dog"
+	// Match: "the lazy"
 	// Missing: "quic"
 	// Missing: "ed over "
 	// Missing: " dog"
+	// Patched result: "The quick brown fox jumped over the lazy dog"
+	// Remotely requested bytes: 16 (without the index!)
+	// Full file length: 44 bytes
 }

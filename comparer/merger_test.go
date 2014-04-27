@@ -158,3 +158,25 @@ func TestMissingCenterBlock(t *testing.T) {
 		t.Errorf("Missing block has wrong end: %v", m[0].EndBlock)
 	}
 }
+
+func TestMissingEndBlock(t *testing.T) {
+	b := BlockSpanList{
+		{
+			StartBlock: 0,
+			EndBlock:   1,
+		},
+	}
+
+	m := b.GetMissingBlocks(3)
+
+	if len(m) != 1 {
+		t.Fatalf("Wrong number of missing blocks: %v", len(m))
+	}
+
+	if m[0].StartBlock != 2 {
+		t.Errorf("Missing block has wrong start: %v", m[0].StartBlock)
+	}
+	if m[0].EndBlock != 3 {
+		t.Errorf("Missing block has wrong end: %v", m[0].EndBlock)
+	}
+}

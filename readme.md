@@ -37,3 +37,17 @@ The new C2 circular buffer implementation is profiling fairly well, with no allo
 The next job is to finish off the remaining logic required to take the pieces you already have, a source for the bits you don't, and a place to write the result, to actually reconstruct the reference file.
 
 I expect a lot of structural changes as I feel out the shape of things and try and make sure that the direction of dependencies etc makes sense. This isn't currently in a usable state.
+
+### So how do I use this?
+
+#### I don't write code
+I'm putting some command line tools into this package primarily as a demonstration of how to use it.
+See: go-sync/gosync
+
+#### I don't have any version of the file, or a file like it, on the other machine
+Then you just need to transfer the file with compression
+
+#### I have my reference file, as well as a copy of the old version of the file that's on the remote machine 
+Since you know what you're going from and to, a payload that only tells you how to patch is probably most efficient.
+
+#### I have a reference file, and the other machine has something like it
