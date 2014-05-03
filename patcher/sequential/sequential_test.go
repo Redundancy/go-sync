@@ -134,3 +134,41 @@ func TestPatchingEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPatchingEntirelyMissing(t *testing.T) {
+	LOCAL := bytes.NewReader([]byte(""))
+	out := bytes.NewBuffer(nil)
+
+	missing := []patcher.MissingBlockSpan{
+		{
+			BlockSize:    BLOCKSIZE,
+			StartBlock:   0,
+			EndBlock:     10,
+			Hasher:       md5.New(),
+			ExpectedSums: REFERENCE_HASHES[0:10],
+		},
+	}
+
+	matched := []patcher.FoundBlockSpan{}
+
+	err := SequentialPatcher(
+		LOCAL,
+		blocksources.NewByteBlockSource([]byte(REFERENCE_STRING)),
+		missing,
+		matched,
+		1024,
+		out,
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result, err := ioutil.ReadAll(out); err == nil {
+		if bytes.Compare(result, []byte(REFERENCE_STRING)) != 0 {
+			t.Errorf("Result does not equal reference: \"%s\" vs \"%v\"", result, REFERENCE_STRING)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}

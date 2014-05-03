@@ -23,8 +23,15 @@ func SequentialPatcher(
 	maxBlockStorage uint64, // the amount of memory we're allowed to use for temporary data storage
 	output io.Writer,
 ) error {
-	maxBlockMissing := missingLocal[len(missingLocal)-1].EndBlock
-	maxBlockFound := matchedLocal[len(matchedLocal)-1].EndBlock
+	maxBlockMissing := uint(0)
+	if len(missingLocal) > 0 {
+		maxBlockMissing = missingLocal[len(missingLocal)-1].EndBlock
+	}
+
+	maxBlockFound := uint(0)
+	if len(matchedLocal) > 0 {
+		maxBlockFound = matchedLocal[len(matchedLocal)-1].EndBlock
+	}
 
 	if reference == nil {
 		return fmt.Errorf("No BlockSource set for obtaining reference blocks")
