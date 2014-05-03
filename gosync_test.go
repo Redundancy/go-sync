@@ -36,6 +36,37 @@ func ToPatcherMissingSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.
 	return result
 }
 
+func PrintReferenceSpans(prefix string, list comparer.BlockSpanList, reference string, blockSize uint) {
+
+	for _, missingRange := range list {
+		referenceStart := missingRange.StartBlock * blockSize
+		referenceEnd := (missingRange.EndBlock + 1) * blockSize
+
+		if referenceEnd > uint(len(reference)) {
+			referenceEnd = uint(len(reference))
+		}
+
+		fmt.Printf(
+			"%v: \"%v\"\n",
+			prefix,
+			reference[referenceStart:referenceEnd],
+		)
+	}
+}
+
+func PrintLocalSpans(prefix string, list comparer.BlockSpanList, local string, blockSize int64) {
+	for _, matchingRange := range list {
+		localMatchStart := matchingRange.ComparisonStartOffset
+		localMatchEnd := matchingRange.EndOffset(blockSize)
+
+		fmt.Printf(
+			"%v: \"%v\"\n",
+			prefix,
+			local[localMatchStart:localMatchEnd],
+		)
+	}
+}
+
 func Example() {
 	// due to short example strings, use a very small block size
 	// using one this small in practice would increase your file transfer!
@@ -72,32 +103,10 @@ func Example() {
 
 	// a sorted list of ranges of blocks that match between the reference and the local version
 	matchingBlockRanges := merger.GetMergedBlocks()
-
-	for _, matchingRange := range matchingBlockRanges {
-		localMatchStart := matchingRange.ComparisonStartOffset
-		localMatchEnd := matchingRange.EndOffset(BLOCK_SIZE)
-
-		fmt.Printf(
-			"Match: \"%v\"\n",
-			LOCAL_VERSION[localMatchStart:localMatchEnd],
-		)
-	}
+	PrintLocalSpans("Match", matchingBlockRanges, LOCAL_VERSION, BLOCK_SIZE)
 
 	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount))
-
-	for _, missingRange := range missingBlockRanges {
-		referenceStart := missingRange.StartBlock * BLOCK_SIZE
-		referenceEnd := (missingRange.EndBlock + 1) * BLOCK_SIZE
-
-		if referenceEnd > uint(len(REFERENCE)) {
-			referenceEnd = uint(len(REFERENCE))
-		}
-
-		fmt.Printf(
-			"Missing: \"%v\"\n",
-			REFERENCE[referenceStart:referenceEnd],
-		)
-	}
+	PrintReferenceSpans("Missing", missingBlockRanges, REFERENCE, BLOCK_SIZE)
 
 	// the "file" to write to
 	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
