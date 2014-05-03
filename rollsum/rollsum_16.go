@@ -19,34 +19,35 @@ func NewRollsum16(blocksize uint) *Rollsum16 {
 		Rollsum16Base: Rollsum16Base{
 			blockSize: blocksize,
 		},
-		buffer: circularbuffer.NewCircularBuffer(int64(blocksize)),
+		buffer: circularbuffer.MakeC2Buffer(int(blocksize)),
 	}
 }
 
 // Uses 16bit internal values, 4 byte hashes
 type Rollsum16 struct {
 	Rollsum16Base
-	buffer *circularbuffer.CircularBuffer
+	buffer *circularbuffer.C2
 }
 
 // cannot be called concurrently
 func (r *Rollsum16) Write(p []byte) (n int, err error) {
-	overwritten := r.buffer.WriteEvicted(p)
-	remaining := p
 	ulen_p := uint(len(p))
 
-	if ulen_p < r.blockSize {
-		r.RemoveBytes(overwritten)
-	} else {
-		r.Rollsum16Base.Reset()
-	}
-
-	if ulen_p > r.blockSize {
+	if ulen_p >= r.blockSize {
 		// if it's really long, we can just ignore a load of it
-		remaining = p[ulen_p-r.blockSize:]
+		remaining := p[ulen_p-r.blockSize:]
+		r.buffer.Write(remaining)
+		r.Rollsum16Base.SetBlock(remaining)
+	} else {
+		r.buffer.Write(p)
+		r.Rollsum16Base.AddBytes(p)
+
+		evicted := r.buffer.Evicted()
+		if len(evicted) > 0 {
+			r.Rollsum16Base.RemoveBytes(evicted)
+		}
 	}
 
-	r.AddBytes(remaining)
 	return len(p), nil
 }
 
@@ -60,22 +61,25 @@ func (r *Rollsum16) Size() int {
 
 func (r *Rollsum16) Reset() {
 	r.Rollsum16Base.Reset()
-	r.buffer = circularbuffer.NewCircularBuffer(int64(r.blockSize))
+	r.buffer.Reset()
 }
 
 // Sum appends the current hash to b and returns the resulting slice.
 // It does not change the underlying hash state.
+// Note that this is to allow Sum() to reuse a preallocated buffer
 func (r *Rollsum16) Sum(b []byte) []byte {
-	result := make([]byte, 4)
-	r.Rollsum16Base.GetSum(result)
-
-	if b != nil {
-		return append(b, result...)
+	if b != nil && cap(b)-len(b) >= 4 {
+		p := len(b)
+		b = b[:len(b)+4]
+		r.Rollsum16Base.GetSum(b[p:])
+		return b
 	} else {
-		return result
+		result := []byte{0, 0, 0, 0}
+		r.Rollsum16Base.GetSum(result)
+		return append(b, result...)
 	}
 }
 
 func (r *Rollsum16) GetLastBlock() []byte {
-	return r.buffer.Get()
+	return r.buffer.GetBlock()
 }
