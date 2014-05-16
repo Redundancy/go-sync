@@ -1,6 +1,8 @@
 /*
-FileChecksumGenerator provides the holder of the hashing algorithms to be used to generate
-
+package filechecksum provides the FileChecksumGenerator, whose main responsibility is to read a file,
+and generate both weak and strong checksums for every block. It is also used by the comparer, which
+will generate weak checksums for potential byte ranges that could match the index, and strong checksums
+if needed.
 */
 package filechecksum
 
@@ -84,6 +86,11 @@ func (check *FileChecksumGenerator) GetStrongHash() hash.Hash {
 	return check.StrongHash
 }
 
+// GenerateChecksums reads each block of the input file, and outputs first the weak, then the strong checksum
+// to the output writer. It will return a checksum for the whole file.
+// Potentially speaking, this might be better producing a channel of blocks, which would remove the need for io from
+// a number of other places.
+// TODO: Make this output a channel of blocks, move the block loading / writing logic out
 func (check *FileChecksumGenerator) GenerateChecksums(inputFile io.Reader, output io.Writer) (fileChecksum []byte, err error) {
 	fullChecksum := check.GetFileHash()
 	strongHash := check.GetStrongHash()

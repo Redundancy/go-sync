@@ -3,7 +3,7 @@ Go-Sync
 
 gosync is a library inspired by zsync and rsync.
 
-While zsync is built to transfer data between a client and server, rsync is modified to allow distribution over http without an active server (therefore allowing mass-distribution and CDNs). In many ways, it's better than bit-torrent for patching, because it handles offset data blocks due to pre-pending or inserting.
+While rsync is built to transfer data between a client and server, zsync is modified to allow distribution over http without an active server (therefore allowing mass-distribution and CDNs). In many ways, it's better than bit-torrent for patching, because it handles offset data blocks due to pre-pending or inserting.
 
 However, in working with these libraries, I've found that they have limitations:
 * They generally assume smaller payloads (ISO scale) and don't make full use of available CPUs and IOPs
@@ -28,26 +28,11 @@ Ideas for extensions or usage could include:
 * Optimizing archive storage of many versions of the same file
 * Updating distributed caches of files with a single smaller payload by distributing "patch" payloads from known, earlier versions.
 * Distributing Docker layers which update existing files, or new versions of images.
- 
+
 ### Current State
 
-It's currently capable of identifying identical sections of files (see gosync_test.go for an example). Based on this, it should be relatively easy to ask for different sections and produce a new version of the file based on the combined images.
-The new C2 circular buffer implementation is profiling fairly well, with no allocations in the heavy loops and decent performance compared to running md5 on every block.
+go-sync is patching "files" in memory in tests and examples. Benchmarks of various elements of index performance will probably need to wait for after I'm done with the *very* basic command line tools (first pass, single file).
 
-The next job is to finish off the remaining logic required to take the pieces you already have, a source for the bits you don't, and a place to write the result, to actually reconstruct the reference file.
+I'm also working on improving the godoc documentation to make it easier for people (and myself) to use the library in the future, while things are fresh in my mind.
 
-I expect a lot of structural changes as I feel out the shape of things and try and make sure that the direction of dependencies etc makes sense. This isn't currently in a usable state.
-
-### So how do I use this?
-
-#### I don't write code
-I'm putting some command line tools into this package primarily as a demonstration of how to use it.
-See: go-sync/gosync
-
-#### I don't have any version of the file, or a file like it, on the other machine
-Then you just need to transfer the file with compression
-
-#### I have my reference file, as well as a copy of the old version of the file that's on the remote machine 
-Since you know what you're going from and to, a payload that only tells you how to patch is probably most efficient.
-
-#### I have a reference file, and the other machine has something like it
+The rolling checksum should be pretty performant in all forms, as long as it can avoid all allocations (particularly watch out for Sum() if you use that)

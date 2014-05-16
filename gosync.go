@@ -14,34 +14,3 @@ The following optimizations are possible:
 
 */
 package gosync
-
-import (
-	"time"
-)
-
-type FileInfo struct {
-	// Only really for *nix based systems
-	IsExecutable bool
-
-	// Path relative to the "root" for the file
-	SourcePath string
-
-	// Block size to use for the file.
-	// This can be varied by file type to optimise
-	BlockSize uint
-
-	// overall hash of the file
-	Checksum string
-
-	// modification timestamp
-	Modified time.Time
-
-	// url or path from which to get the rollsums
-	RollsumSource string
-
-	// url or path from which to get the content of the blocks
-	ContentSource string
-}
-
-// Relative file path -> FileInfo
-type PackageManifest map[string]FileInfo

@@ -1,3 +1,7 @@
+/*
+Package indexbuilder provides a few shortbuts to building a checksum index by generating and then loading
+the checksums, and building an index from that. It's potentially a sign that the responsibilities here need refactoring.
+*/
 package indexbuilder
 
 import (

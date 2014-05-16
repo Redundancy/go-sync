@@ -1,5 +1,5 @@
 /*
-Package index provides the functionality to describe a 'file' and its contents in terms of
+Package index provides the functionality to describe a reference 'file' and its contents in terms of
 the weak and strong checksums, in such a way that you can check if a weak checksum is present,
 then check if there is a strong checksum that matches.
 
