@@ -15,6 +15,7 @@ import (
 const (
 	READ_NEXT_BYTE = iota
 	READ_NEXT_BLOCK
+	READ_NONE
 )
 
 // If the weak Hash object satisfies this interface, then
@@ -50,7 +51,7 @@ func FindMatchingBlocks(
 	comparison io.Reader,
 	baseOffset int64,
 	generator *filechecksum.FileChecksumGenerator,
-	reference *index.ChecksumIndex,
+	referenceIndex *index.ChecksumIndex,
 ) <-chan BlockMatchResult {
 
 	resultStream := make(chan BlockMatchResult)
@@ -60,7 +61,7 @@ func FindMatchingBlocks(
 		comparison,
 		baseOffset,
 		generator,
-		reference,
+		referenceIndex,
 	)
 
 	return resultStream
@@ -79,6 +80,7 @@ type strongUpdater struct {
 
 /*
 TODO: Refactor Weak / Strong updates / Reading + counting
+BUG: find matching blocks does not match partial blocks at the end
 */
 func findMatchingBlocks_int(
 	results chan<- BlockMatchResult,
@@ -147,26 +149,36 @@ func findMatchingBlocks_int(
 			}
 		}
 
+		var n int
+		var readBytes []byte
+
 		switch next {
 		case READ_NEXT_BYTE:
-			_, err = comparison.Read(singleByte)
-			generator.WeakRollingHash.AddBytes(singleByte)
-			blockMemory.Write(singleByte)
-			generator.WeakRollingHash.RemoveBytes(blockMemory.Evicted())
-			i += 1
+			n, err = comparison.Read(singleByte)
+			readBytes = singleByte
 		case READ_NEXT_BLOCK:
-			_, err = io.ReadFull(comparison, block)
-
-			if err == nil {
-				generator.WeakRollingHash.SetBlock(block)
-				blockMemory.Write(block)
-				i += int64(generator.BlockSize)
-			} else if err == io.EOF || err == io.ErrUnexpectedEOF {
-				err = io.EOF
-				break
-			}
-			// Reset to reading bytes
+			n, err = io.ReadFull(comparison, block)
+			readBytes = block[:n]
 			next = READ_NEXT_BYTE
+		}
+
+		if uint(n) == generator.BlockSize {
+			generator.WeakRollingHash.SetBlock(block)
+			blockMemory.Write(block)
+			i += int64(n)
+		} else if n > 0 {
+			generator.WeakRollingHash.AddBytes(readBytes)
+			blockMemory.Write(readBytes)
+			generator.WeakRollingHash.RemoveBytes(blockMemory.Evicted())
+			i += int64(n)
+		}
+
+		if next == READ_NONE {
+			// TODO: Empty circular buffer to compare against the end of the reference
+			break
+		} else if err == io.EOF || err == io.ErrUnexpectedEOF {
+			err = io.EOF
+			next = READ_NONE
 		}
 
 	}
