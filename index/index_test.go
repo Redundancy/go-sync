@@ -58,6 +58,46 @@ func TestFindStrongInIndex(t *testing.T) {
 	}
 }
 
+func TestNotFoundStrongInIndexAtEnd(t *testing.T) {
+	i := MakeChecksumIndex(
+		[]chunks.ChunkChecksum{
+			{0, []byte("a"), []byte("b")},
+			{1, []byte("b"), []byte("c")},
+			{2, []byte("b"), []byte("d")},
+		},
+	)
+
+	// builds upon TestFindWeakInIndex
+	result := i.FindWeakChecksumInIndex([]byte("b"))
+	strongs := result.FindStrongChecksum([]byte("e"))
+
+	if len(strongs) != 0 {
+		t.Errorf("Incorrect number of strong checksums found: %v", strongs)
+	}
+}
+
+func TestNotFoundStrongInIndexInCenter(t *testing.T) {
+	// The strong checksum we're looking for is not found
+	// but is < another checksum in the strong list
+
+	i := MakeChecksumIndex(
+		[]chunks.ChunkChecksum{
+			{0, []byte("a"), []byte("b")},
+			{1, []byte("b"), []byte("c")},
+			{2, []byte("b"), []byte("d")},
+			{3, []byte("b"), []byte("f")},
+		},
+	)
+
+	// builds upon TestFindWeakInIndex
+	result := i.FindWeakChecksumInIndex([]byte("b"))
+	strongs := result.FindStrongChecksum([]byte("e"))
+
+	if len(strongs) != 0 {
+		t.Errorf("Incorrect number of strong checksums found: %v", strongs)
+	}
+}
+
 func TestFindDuplicatedBlocksInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
@@ -76,10 +116,40 @@ func TestFindDuplicatedBlocksInIndex(t *testing.T) {
 		t.Fatalf("Incorrect number of strong checksums found: %v", strongs)
 	}
 
-	if strongs[0].ChunkOffset != 1 {
-		t.Errorf("Wrong chunk found, had offset %v", strongs[0].ChunkOffset)
+	first := strongs[0]
+	if first.ChunkOffset != 1 {
+		t.Errorf("Wrong chunk found, had offset %v", first.ChunkOffset)
 	}
-	if strongs[1].ChunkOffset != 3 {
-		t.Errorf("Wrong chunk found, had offset %v", strongs[1].ChunkOffset)
+
+	second := strongs[1]
+	if second.ChunkOffset != 3 {
+		t.Errorf("Wrong chunk found, had offset %v", second.ChunkOffset)
+	}
+}
+
+func TestFindTwoDuplicatedBlocksInIndex(t *testing.T) {
+	i := MakeChecksumIndex(
+		[]chunks.ChunkChecksum{
+			{1, []byte("b"), []byte("c")},
+			{2, []byte("b"), []byte("c")},
+		},
+	)
+
+	// builds upon TestFindWeakInIndex
+	result := i.FindWeakChecksumInIndex([]byte("b"))
+	strongs := result.FindStrongChecksum([]byte("c"))
+
+	if len(strongs) != 2 {
+		t.Fatalf("Incorrect number of strong checksums found: %v", strongs)
+	}
+
+	first := strongs[0]
+	if first.ChunkOffset != 1 {
+		t.Errorf("Wrong chunk found, had offset %v", first.ChunkOffset)
+	}
+
+	second := strongs[1]
+	if second.ChunkOffset != 2 {
+		t.Errorf("Wrong chunk found, had offset %v", second.ChunkOffset)
 	}
 }

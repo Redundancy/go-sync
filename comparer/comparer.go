@@ -68,19 +68,7 @@ func FindMatchingBlocks(
 }
 
 /*
-type weakUpdater struct {
-	hash
-	weaksum []byte
-}
-
-type strongUpdater struct {
-	hash hash.Hash
-}
-*/
-
-/*
-TODO: Refactor Weak / Strong updates / Reading + counting
-BUG: find matching blocks does not match partial blocks at the end
+TODO: When matching duplicated blocks, a channel of BlockMatchResult slices would be more efficient
 */
 func findMatchingBlocks_int(
 	results chan<- BlockMatchResult,
@@ -134,16 +122,22 @@ func findMatchingBlocks_int(
 			strong.Write(block)
 			strongSum = strong.Sum(strongSum)
 			strongList := weakMatchList.FindStrongChecksum(strongSum)
+
+			// clear the slice
 			strongSum = strongSum[:0]
 
-			// if there was a strong match, we only care about 1 of them
-			// the assumption is that we have repeated blocks of the same data
-			if len(strongList) != 0 {
+			// If there are many matches, it means that this block is
+			// duplicated in the reference.
+			// since we care about finding all the blocks in the reference,
+			// we must report all of them
+			for _, strongMatch := range strongList {
 				results <- BlockMatchResult{
 					ComparisonOffset: i + baseOffset,
-					BlockIdx:         strongList[0].ChunkOffset,
+					BlockIdx:         strongMatch.ChunkOffset,
 				}
+			}
 
+			if len(strongList) != 0 {
 				if next == READ_NONE {
 					break
 				}

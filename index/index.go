@@ -67,15 +67,27 @@ func (s StrongChecksumList) Less(i, j int) bool {
 }
 
 func (s StrongChecksumList) FindStrongChecksum(strong []byte) (result []chunks.ChunkChecksum) {
+	n := len(s)
 	// find the first possible occurance
-	start := sort.Search(
-		len(s),
-		func(i int) bool { return bytes.Compare(s[i].StrongChecksum, strong) >= 0 },
+	first_gte_checksum := sort.Search(
+		n,
+		func(i int) bool {
+			return bytes.Compare(s[i].StrongChecksum, strong) >= 0
+		},
 	)
 
-	end := start + 1
-	len_s := len(s)
-	for end+1 < len_s {
+	// out of bounds
+	if first_gte_checksum == -1 || first_gte_checksum == n {
+		return nil
+	}
+
+	// Somewhere in the middle, but the next one didn't match
+	if bytes.Compare(s[first_gte_checksum].StrongChecksum, strong) != 0 {
+		return nil
+	}
+
+	end := first_gte_checksum + 1
+	for end < n {
 		if bytes.Compare(s[end].StrongChecksum, strong) == 0 {
 			end += 1
 		} else {
@@ -84,5 +96,5 @@ func (s StrongChecksumList) FindStrongChecksum(strong []byte) (result []chunks.C
 
 	}
 
-	return s[start:end]
+	return s[first_gte_checksum:end]
 }
