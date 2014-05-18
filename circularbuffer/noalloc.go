@@ -10,16 +10,29 @@ guarantee that both of these bits of information can always be obtained in a sin
 Other than the cost of the extra memory (4xblocksize), this means that it requires 2 writes for every byte stored.
 */
 type C2 struct {
-	lastWritten  int
+	// used to know how much was evicted
+	lastWritten int
+
+	// total number of written bytes
+	// used to track if the buffer has been filled, but goes above blocksize
 	totalWritten int
-	blocksize    int
-	a, b         doubleSizeBuffer
+
+	// quick access to the circular buffer size
+	blocksize int
+
+	// double internal buffer storage
+	a, b doubleSizeBuffer
 }
 
 type doubleSizeBuffer struct {
+	// used to reset the head pointer
 	baseOffset int
-	head       int
-	buffer     []byte
+
+	// index of the next byte to be written
+	head int
+
+	// buffer
+	buffer []byte
 }
 
 func MakeC2Buffer(blockSize int) *C2 {
@@ -52,20 +65,51 @@ func (c *C2) Write(b []byte) {
 	c.totalWritten += c.lastWritten
 }
 
+func (c *C2) getBlockBuffer() *doubleSizeBuffer {
+	bufferToRead := &c.a
+	if c.b.head > c.a.head {
+		bufferToRead = &c.b
+	}
+
+	return bufferToRead
+}
+
+// the total written, up to the blocksize
+func (c *C2) maxWritten() int {
+	if c.totalWritten < c.blocksize {
+		return c.totalWritten
+	}
+
+	return c.blocksize
+}
+
+func (c *C2) Empty() bool {
+	return c.totalWritten == 0
+}
+
+// Shortens the content of the circular buffer
+// and returns the content removed
+func (c *C2) Truncate(byteCount int) (evicted []byte) {
+	max := c.maxWritten()
+
+	if byteCount > max {
+		byteCount = max
+	}
+
+	bufferToRead := c.getBlockBuffer()
+	start := bufferToRead.head - max
+
+	c.totalWritten = c.maxWritten() - byteCount
+	return bufferToRead.buffer[start : start+byteCount]
+}
+
 // get the current buffer contents of block
 func (c *C2) GetBlock() []byte {
 	// figure out which buffer has it stored contiguously
-	bufferToRead := c.a
-	if c.b.head > c.a.head {
-		bufferToRead = c.b
-	}
+	bufferToRead := c.getBlockBuffer()
+	start := bufferToRead.head - c.maxWritten()
 
-	getSize := c.blocksize
-	if c.totalWritten < c.blocksize {
-		getSize = c.totalWritten
-	}
-
-	return bufferToRead.buffer[bufferToRead.head-getSize : bufferToRead.head]
+	return bufferToRead.buffer[start:bufferToRead.head]
 }
 
 // get the data that was evicted by the last write

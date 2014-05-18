@@ -31,7 +31,9 @@ Ideas for extensions or usage could include:
 
 ### Current State
 
-go-sync is patching "files" in memory in tests and examples. Benchmarks of various elements of index performance will probably need to wait for after I'm done with the *very* basic command line tools (first pass, single file).
+go-sync is patching "files" in memory in tests and examples. Benchmarks of various elements of index performance are on the agenda as soon as basic functionality is all working as intended.
+
+The commandline tools are currently fleshed out only to the extent that I can test some things. In particular, I'm doing some artificial tests comparing files to themselves, and diffing versions of things like jQuery. The results are that there are currently some issues, so I'm improving my tests to deal with those cases.
 
 I'm also working on improving the godoc documentation to make it easier for people (and myself) to use the library in the future, while things are fresh in my mind.
 

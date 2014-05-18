@@ -123,7 +123,7 @@ func findMatchingBlocks_int(
 	next := READ_NEXT_BYTE
 
 	//ReadLoop:
-	for err == nil {
+	for {
 		// look for a weak match
 		generator.WeakRollingHash.GetSum(weaksum)
 		if weakMatchList := reference.FindWeakChecksumInIndex(weaksum); weakMatchList != nil {
@@ -144,6 +144,9 @@ func findMatchingBlocks_int(
 					BlockIdx:         strongList[0].ChunkOffset,
 				}
 
+				if next == READ_NONE {
+					break
+				}
 				// No point looking for a match that overlaps this block
 				next = READ_NEXT_BLOCK
 			}
@@ -173,14 +176,19 @@ func findMatchingBlocks_int(
 			i += int64(n)
 		}
 
-		if next == READ_NONE {
-			// TODO: Empty circular buffer to compare against the end of the reference
-			break
-		} else if err == io.EOF || err == io.ErrUnexpectedEOF {
+		if next != READ_NONE && (err == io.EOF || err == io.ErrUnexpectedEOF) {
 			err = io.EOF
 			next = READ_NONE
 		}
 
+		if next == READ_NONE {
+			if blockMemory.Empty() {
+				break
+			}
+			removedByte := blockMemory.Truncate(1)
+			generator.WeakRollingHash.RemoveBytes(removedByte)
+			i += 1
+		}
 	}
 
 	if err != io.EOF {

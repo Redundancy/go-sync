@@ -23,8 +23,19 @@ func CheckResults(
 		}
 
 		os := i.BlockIdx * block_size
-		orignal := original[os : os+block_size]
-		compare := modified[i.ComparisonOffset : i.ComparisonOffset+int64(block_size)]
+		original_max := os + block_size
+		if original_max > uint(len(original)) {
+			original_max = uint(len(original))
+		}
+
+		orignal := original[os:original_max]
+
+		compare_max := i.ComparisonOffset + int64(block_size)
+		if compare_max > int64(len(modified)) {
+			compare_max = int64(len(modified))
+		}
+
+		compare := modified[i.ComparisonOffset:compare_max]
 
 		if orignal != compare {
 			t.Errorf(
