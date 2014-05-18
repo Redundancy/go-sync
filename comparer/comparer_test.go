@@ -181,3 +181,37 @@ func TestDetectsModifiedContent(t *testing.T) {
 		3,
 	)
 }
+
+func TestDetectsPartialBlockAtEnd(t *testing.T) {
+	const BLOCK_SIZE = 4
+	var err error
+	const A = "abcdefghijklmnopqrstuvwxyz"
+	const ORIGINAL_STRING = A
+	const MODIFIED_STRING = A
+
+	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
+	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
+	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
+
+	results := FindMatchingBlocks(
+		modifiedContent,
+		0,
+		generator,
+		reference,
+	)
+
+	CheckResults(
+		t,
+		ORIGINAL_STRING,
+		MODIFIED_STRING,
+		results,
+		BLOCK_SIZE,
+		7, // [abcd efgh ijkl mnop qrst uvwx yz]
+	)
+}
