@@ -76,7 +76,7 @@ func (s StrongChecksumList) FindStrongChecksum(strong []byte) (result []chunks.C
 	end := start + 1
 	len_s := len(s)
 	for end+1 < len_s {
-		if bytes.Compare(s[end+1].StrongChecksum, strong) == 0 {
+		if bytes.Compare(s[end].StrongChecksum, strong) == 0 {
 			end += 1
 		} else {
 			break
