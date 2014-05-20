@@ -1,6 +1,7 @@
 package comparer
 
 import (
+	"github.com/petar/GoLLRB/llrb"
 	"sort"
 	"sync"
 )
@@ -11,9 +12,16 @@ type MatchMerger struct {
 	sync.Mutex
 
 	wait sync.WaitGroup
+
+	// Porting from map to llrb, to enable finding of the next
+	// largest blockID (What's the first blockID after 5?)
+	startEndBlockMap2 *llrb.LLRB
+
 	// BlockSpans are stored by both start and end block ids
 	// if anything shares borders of these, they should be merged
 	startEndBlockMap map[uint]*BlockSpan
+
+	blockCount uint
 }
 
 // a span of multiple blocks, from start to end, which match the blocks
@@ -24,6 +32,45 @@ type BlockSpan struct {
 
 	// byte offset in the comparison for the match
 	ComparisonStartOffset int64
+}
+
+type BlockSpanIndex interface {
+	Position() uint
+}
+
+// Wraps a blockspan so that it may easily be used
+// in llrb. Corresponds to the start block of the blockspan.
+type BlockSpanStart BlockSpan
+
+func (s BlockSpanStart) Position() uint {
+	return s.StartBlock
+}
+
+func (s BlockSpanStart) Less(than llrb.Item) bool {
+	return s.StartBlock < than.(BlockSpanIndex).Position()
+}
+
+// Wraps a blockspan so that it may easily be used
+// in llrb. Corresponds to the end of the blockspan.
+type BlockSpanEnd BlockSpan
+
+func (s BlockSpanEnd) Position() uint {
+	return s.EndBlock
+}
+
+func (s BlockSpanEnd) Less(than llrb.Item) bool {
+	return s.EndBlock < than.(BlockSpanIndex).Position()
+}
+
+// Wraps a block index, allowing easy use of llrb.Get()
+type BlockSpanKey uint
+
+func (s BlockSpanKey) Position() uint {
+	return uint(s)
+}
+
+func (k BlockSpanKey) Less(than llrb.Item) bool {
+	return uint(k) < than.(BlockSpanIndex).Position()
 }
 
 func (b BlockSpan) EndOffset(blockSize int64) int64 {
@@ -69,59 +116,73 @@ func (merger *MatchMerger) merge(block1, block2 *BlockSpan, blockSize int64) {
 }
 
 // Can be used on multiple streams of results simultaneously
+// starts working asyncronously, call from the initiating goroutine
 func (merger *MatchMerger) MergeResults(
 	resultStream <-chan BlockMatchResult,
 	blockSize int64,
 ) {
+	// Add should be called on the main goroutine
+	// to ensure that it has happened before wait is called
 	merger.wait.Add(1)
-	defer merger.wait.Done()
 
-	for result := range resultStream {
-		if result.Err != nil {
-			return
+	go func() {
+		defer merger.wait.Done()
+
+		for result := range resultStream {
+			if result.Err != nil {
+				return
+			}
+
+			merger.Lock()
+			merger.blockCount += 1
+
+			if merger.startEndBlockMap == nil {
+				merger.startEndBlockMap = make(map[uint]*BlockSpan)
+			}
+
+			blockID := result.BlockIdx
+			preceeding, foundBefore := merger.startEndBlockMap[blockID-1]
+			following, foundAfter := merger.startEndBlockMap[blockID+1]
+
+			asBlockSpan := toBlockSpan(result)
+
+			if _, blockAlreadyExists := merger.startEndBlockMap[blockID]; blockAlreadyExists {
+				merger.Unlock()
+				continue
+			}
+
+			merger.startEndBlockMap[blockID] = toBlockSpan(result)
+
+			if foundBefore && foundAfter {
+				merger.merge(
+					asBlockSpan,
+					preceeding,
+					blockSize,
+				)
+
+				merger.merge(
+					preceeding,
+					following,
+					blockSize,
+				)
+
+			} else if foundBefore {
+				merger.merge(
+					asBlockSpan,
+					preceeding,
+					blockSize,
+				)
+			} else if foundAfter {
+				merger.merge(
+					asBlockSpan,
+					following,
+					blockSize,
+				)
+			}
+
+			merger.Unlock()
 		}
-
-		merger.Lock()
-		if merger.startEndBlockMap == nil {
-			merger.startEndBlockMap = make(map[uint]*BlockSpan)
-		}
-
-		blockID := result.BlockIdx
-		preceeding, foundBefore := merger.startEndBlockMap[blockID-1]
-		following, foundAfter := merger.startEndBlockMap[blockID+1]
-
-		asBlockSpan := toBlockSpan(result)
-		merger.startEndBlockMap[blockID] = toBlockSpan(result)
-
-		if foundBefore && foundAfter {
-			merger.merge(
-				asBlockSpan,
-				preceeding,
-				blockSize,
-			)
-
-			merger.merge(
-				preceeding,
-				following,
-				blockSize,
-			)
-
-		} else if foundBefore {
-			merger.merge(
-				asBlockSpan,
-				preceeding,
-				blockSize,
-			)
-		} else if foundAfter {
-			merger.merge(
-				asBlockSpan,
-				following,
-				blockSize,
-			)
-		}
-
-		merger.Unlock()
-	}
+	}()
 }
 
 type BlockSpanList []BlockSpan
