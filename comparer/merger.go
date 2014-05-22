@@ -15,11 +15,7 @@ type MatchMerger struct {
 
 	// Porting from map to llrb, to enable finding of the next
 	// largest blockID (What's the first blockID after 5?)
-	startEndBlockMap2 *llrb.LLRB
-
-	// BlockSpans are stored by both start and end block ids
-	// if anything shares borders of these, they should be merged
-	startEndBlockMap map[uint]*BlockSpan
+	startEndBlockMap *llrb.LLRB
 
 	blockCount uint
 }
@@ -95,6 +91,16 @@ func isBordering(a, b *BlockSpan, blockSize int64) bool {
 	return false
 }
 
+func itemToBlockSpan(in llrb.Item) BlockSpan {
+	switch i := in.(type) {
+	case BlockSpanStart:
+		return BlockSpan(i)
+	case BlockSpanEnd:
+		return BlockSpan(i)
+	}
+	return BlockSpan{}
+}
+
 // if merged, the block span remaining is the one with the lower start block
 func (merger *MatchMerger) merge(block1, block2 *BlockSpan, blockSize int64) {
 	var a, b *BlockSpan = block1, block2
@@ -106,12 +112,12 @@ func (merger *MatchMerger) merge(block1, block2 *BlockSpan, blockSize int64) {
 	if isBordering(a, b, blockSize) {
 		// bordering, merge
 		// A ------ A B ------ B > A ---------------- A
-		delete(merger.startEndBlockMap, a.EndBlock)
-		delete(merger.startEndBlockMap, b.StartBlock)
+		merger.startEndBlockMap.Delete(BlockSpanKey(a.EndBlock))
+		merger.startEndBlockMap.Delete(BlockSpanKey(b.StartBlock))
 		a.EndBlock = b.EndBlock
 
-		merger.startEndBlockMap[a.StartBlock] = a
-		merger.startEndBlockMap[a.EndBlock] = a
+		merger.startEndBlockMap.ReplaceOrInsert(BlockSpanStart(*a))
+		merger.startEndBlockMap.ReplaceOrInsert(BlockSpanEnd(*a))
 	}
 }
 
@@ -125,6 +131,10 @@ func (merger *MatchMerger) MergeResults(
 	// to ensure that it has happened before wait is called
 	merger.wait.Add(1)
 
+	// used by the llrb iterator to signal that it found/didn't find
+	// an existing key on or spanning the given block
+	//foundExisting := make(chan bool)
+
 	go func() {
 		defer merger.wait.Done()
 
@@ -137,45 +147,82 @@ func (merger *MatchMerger) MergeResults(
 			merger.blockCount += 1
 
 			if merger.startEndBlockMap == nil {
-				merger.startEndBlockMap = make(map[uint]*BlockSpan)
+				merger.startEndBlockMap = llrb.New()
 			}
 
 			blockID := result.BlockIdx
-			preceeding, foundBefore := merger.startEndBlockMap[blockID-1]
-			following, foundAfter := merger.startEndBlockMap[blockID+1]
+			preceeding := merger.startEndBlockMap.Get(BlockSpanKey(blockID - 1))
+			following := merger.startEndBlockMap.Get(BlockSpanKey(blockID + 1))
 
 			asBlockSpan := toBlockSpan(result)
 
-			if _, blockAlreadyExists := merger.startEndBlockMap[blockID]; blockAlreadyExists {
+			var foundExisting bool
+			// Exists, or within an existing span
+			merger.startEndBlockMap.AscendGreaterOrEqual(
+				BlockSpanKey(blockID),
+				// iterator
+				func(i llrb.Item) bool {
+					j, ok := i.(BlockSpanIndex)
+
+					if !ok {
+						foundExisting = true
+						return false
+					}
+
+					switch k := j.(type) {
+					case BlockSpanStart:
+						// it's only overlapping if its the same blockID
+						foundExisting = k.StartBlock == blockID
+						return false
+
+					case BlockSpanEnd:
+						// we didn't find a start, so there's an end that overlaps
+						foundExisting = true
+						return false
+					default:
+						foundExisting = true
+						return false
+					}
+
+				},
+			)
+
+			if foundExisting {
 				merger.Unlock()
 				continue
 			}
 
-			merger.startEndBlockMap[blockID] = toBlockSpan(result)
+			merger.startEndBlockMap.ReplaceOrInsert(
+				BlockSpanStart(*toBlockSpan(result)),
+			)
 
-			if foundBefore && foundAfter {
+			if preceeding != nil && following != nil {
+				a := itemToBlockSpan(preceeding)
 				merger.merge(
 					asBlockSpan,
-					preceeding,
+					&a,
 					blockSize,
 				)
 
+				b := itemToBlockSpan(following)
 				merger.merge(
-					preceeding,
-					following,
+					&a,
+					&b,
 					blockSize,
 				)
 
-			} else if foundBefore {
+			} else if preceeding != nil {
+				a := itemToBlockSpan(preceeding)
 				merger.merge(
 					asBlockSpan,
-					preceeding,
+					&a,
 					blockSize,
 				)
-			} else if foundAfter {
+			} else if following != nil {
+				b := itemToBlockSpan(following)
 				merger.merge(
 					asBlockSpan,
-					following,
+					&b,
 					blockSize,
 				)
 			}
@@ -203,13 +250,16 @@ func (l BlockSpanList) Less(i, j int) bool {
 func (merger *MatchMerger) GetMergedBlocks() (sorted BlockSpanList) {
 	merger.wait.Wait()
 	var smallestKey uint = 0
+	m := merger.startEndBlockMap
 
-	for _, block := range merger.startEndBlockMap {
-		if block.StartBlock >= smallestKey {
-			sorted = append(sorted, *block)
+	m.AscendGreaterOrEqual(m.Min(), func(item llrb.Item) bool {
+		switch block := item.(type) {
+		case BlockSpanStart:
+			sorted = append(sorted, BlockSpan(block))
 			smallestKey = block.StartBlock + 1
 		}
-	}
+		return true
+	})
 
 	sort.Sort(sorted)
 	return

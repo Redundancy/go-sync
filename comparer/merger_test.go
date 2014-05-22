@@ -65,8 +65,8 @@ func TestMergeAdjacentBlocksBefore(t *testing.T) {
 	}
 
 	// start and end
-	if len(merger.startEndBlockMap) != 2 {
-		t.Errorf("Wrong number of entries in the map: %v", len(merger.startEndBlockMap))
+	if merger.startEndBlockMap.Len() != 2 {
+		t.Errorf("Wrong number of entries in the map: %v", merger.startEndBlockMap.Len())
 	}
 }
 
@@ -107,8 +107,8 @@ func TestMergeAdjacentBlocksBetween(t *testing.T) {
 	if merged[0].StartBlock != 0 {
 		t.Errorf("Wrong StartBlock, expected 0, got %#v", merged[0])
 	}
-	if len(merger.startEndBlockMap) != 2 {
-		t.Errorf("Wrong number of entries in the map: %v", len(merger.startEndBlockMap))
+	if merger.startEndBlockMap.Len() != 2 {
+		t.Errorf("Wrong number of entries in the map: %v", merger.startEndBlockMap.Len())
 	}
 }
 
@@ -283,6 +283,7 @@ func TestDoublyDuplicatedBlocks(t *testing.T) {
 		ComparisonOffset: BLOCK_SIZE,
 		BlockIdx:         1,
 	}
+
 	close(mergeChan)
 
 	merged := merger.GetMergedBlocks()
@@ -298,12 +299,61 @@ func TestDoublyDuplicatedBlocks(t *testing.T) {
 	}
 }
 
+func TestBlockWithinSpan(t *testing.T) {
+	// catch the case where we're informed about a block,
+	// after we've merged blocks around it, so that the start and end
+	// are within a span, not bordering one
+	const BLOCK_SIZE = 4
+
+	mergeChan := make(chan BlockMatchResult)
+	merger := &MatchMerger{}
+	merger.MergeResults(mergeChan, BLOCK_SIZE)
+
+	mergeChan <- BlockMatchResult{
+		ComparisonOffset: 0,
+		BlockIdx:         0,
+	}
+
+	mergeChan <- BlockMatchResult{
+		ComparisonOffset: BLOCK_SIZE,
+		BlockIdx:         1,
+	}
+
+	mergeChan <- BlockMatchResult{
+		ComparisonOffset: 2 * BLOCK_SIZE,
+		BlockIdx:         2,
+	}
+
+	// This one is a duplicate of an earlier one
+	mergeChan <- BlockMatchResult{
+		ComparisonOffset: BLOCK_SIZE,
+		BlockIdx:         1,
+	}
+
+	close(mergeChan)
+
+	merged := merger.GetMergedBlocks()
+
+	if len(merged) != 1 {
+		t.Fatalf("Wrong number of blocks returned: %#v", merged)
+	}
+
+	if merged[0].EndBlock != 2 {
+		t.Errorf("Wrong EndBlock, expected 2 got %#v", merged[0])
+	}
+
+	// start and end
+	if merger.startEndBlockMap.Len() != 2 {
+		t.Errorf("Wrong number of entries in the map: %v", merger.startEndBlockMap.Len())
+	}
+}
+
 // Just to test out usage of the LLRB interface and helpers
 func TestLLRB(t *testing.T) {
 	m := &MatchMerger{}
-	m.startEndBlockMap2 = llrb.New()
+	m.startEndBlockMap = llrb.New()
 
-	bm := m.startEndBlockMap2
+	bm := m.startEndBlockMap
 
 	bm.ReplaceOrInsert(
 		BlockSpanStart(
