@@ -69,19 +69,44 @@ func Patch(c *cli.Context) {
 	fmt.Println("Finding matching blocks")
 	matchStream := comparer.FindMatchingBlocks(local_file, 0, generator, index)
 
+	/*
+		last := -1
+		for m := range matchStream {
+			if m.BlockIdx != uint(last+1) {
+				fmt.Println("Missing or skip:", last, m.BlockIdx, m.ComparisonOffset)
+			}
+			last = int(m.BlockIdx)
+		}*/
+
 	merger := &comparer.MatchMerger{}
 	fmt.Println("Merging")
 	merger.MergeResults(matchStream, int64(blocksize))
 
 	mergedBlocks := merger.GetMergedBlocks()
 
+	fmt.Println("\nMatched:")
 	totalMatchingSize := uint64(0)
+	matchedBlockCountAfterMerging := uint(0)
+
 	for _, b := range mergedBlocks {
 		fmt.Printf("%#v\n", b)
 		totalMatchingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
+		matchedBlockCountAfterMerging += b.EndBlock - b.StartBlock + 1
 	}
 
 	fmt.Println("Total matched bytes:", totalMatchingSize)
+	fmt.Println("Total matched blocks:", matchedBlockCountAfterMerging)
+
+	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount))
+
+	//fmt.Println("\nMissing:")
+	totalMissingSize := uint64(0)
+	for _, b := range missing {
+		//fmt.Printf("%#v\n", b)
+		totalMissingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
+	}
+
+	fmt.Println("Total missing bytes:", totalMissingSize)
 }
 
 func openFileAndHandleError(filename string) (f *os.File) {

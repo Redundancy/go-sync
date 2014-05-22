@@ -33,8 +33,20 @@ Ideas for extensions or usage could include:
 
 go-sync is patching "files" in memory in tests and examples. Benchmarks of various elements of index performance are on the agenda as soon as basic functionality is all working as intended.
 
-The commandline tools are currently fleshed out only to the extent that I can test some things. In particular, I'm doing some artificial tests comparing files to themselves, and diffing versions of things like jQuery. The results are that there are currently some issues, so I'm improving my tests to deal with those cases.
+The commandline tools are currently fleshed out only to the extent that I can test some things. In particular, I'm doing some artificial tests comparing files to themselves, and diffing versions of things like jQuery. 
 
-I'm also working on improving the godoc documentation to make it easier for people (and myself) to use the library in the future, while things are fresh in my mind.
+Duplicated blocks are now being handled (from initial appearances) consistently and correctly now. Performance is pretty good when files are similar (it's almost instant on a same-to-same comparison of around 8 MB). Comparison of jQuery 1.11.1 to 1.2.1 is showing a difference of around 30kiB, with ~200kiB matched at 20b block size.
 
 The rolling checksum should be pretty performant in all forms, as long as it can avoid all allocations (particularly watch out for Sum() if you use that)
+
+After getting on-disk patching working, the next big thing will be to do an http/s blocksource.
+
+### Testing
+
+#### Unit tests
+go test github.com/Redundancy/go-sync/...
+
+#### Commandline & files
+go build github.com/Redundancy/go-sync/gosync
+gosync b filenameToPatchTo
+gosync p filenameToPatchFrom filenameToPatchTo.gosync
