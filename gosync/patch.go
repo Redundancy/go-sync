@@ -8,7 +8,10 @@ import (
 	"github.com/Redundancy/go-sync/filechecksum"
 	sync_index "github.com/Redundancy/go-sync/index"
 	"github.com/codegangsta/cli"
+	"io"
 	"os"
+	"runtime"
+	"time"
 )
 
 func init() {
@@ -22,7 +25,9 @@ func init() {
 			
 			`,
 			Action: Patch,
-			Flags:  []cli.Flag{},
+			Flags: []cli.Flag{
+				cli.IntFlag{"p", runtime.NumCPU(), "The number of streams to use concurrently"},
+			},
 		},
 	)
 }
@@ -30,6 +35,7 @@ func init() {
 func Patch(c *cli.Context) {
 	local_filename := c.Args()[0]
 	reference_filename := c.Args()[1]
+	start_time := time.Now()
 
 	local_file := openFileAndHandleError(local_filename)
 
@@ -58,8 +64,6 @@ func Patch(c *cli.Context) {
 	fmt.Println("Blocksize: ", blocksize)
 	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
 
-	fmt.Println("Loading checksums")
-
 	readChunks, err := chunks.LoadChecksumsFromReader(
 		reference_file,
 		generator.WeakRollingHash.Size(),
@@ -71,15 +75,46 @@ func Patch(c *cli.Context) {
 		return
 	}
 
-	fmt.Println("building index")
 	index := sync_index.MakeChecksumIndex(readChunks)
 
-	fmt.Println("Finding matching blocks")
-	matchStream := comparer.FindMatchingBlocks(local_file, 0, generator, index)
+	fi, err := local_file.Stat()
 
+	if err != nil {
+		fmt.Println("Could not get info on file:", err)
+		os.Exit(1)
+	}
+
+	num_matchers := int64(c.Int("p"))
+
+	local_file_size := fi.Size()
+
+	// Don't split up small files
+	if local_file_size < 1024*1024 {
+		num_matchers = 1
+	}
+
+	sectionSize := local_file_size / num_matchers
+	sectionSize += int64(blocksize) - (sectionSize % int64(blocksize))
 	merger := &comparer.MatchMerger{}
-	fmt.Println("Merging")
-	merger.StartMergeResultStream(matchStream, int64(blocksize))
+
+	fmt.Printf("Using %v cores\n", num_matchers)
+
+	for i := int64(0); i < num_matchers; i++ {
+		offset := sectionSize * i
+
+		// Sections must overlap by blocksize
+		if i > 0 {
+			offset -= int64(blocksize)
+		}
+
+		sectionReader := io.NewSectionReader(local_file, offset, sectionSize)
+		sectionGenerator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
+
+		matchStream := comparer.StartFindMatchingBlocks(
+			sectionReader, offset, sectionGenerator, index)
+
+		merger.StartMergeResultStream(matchStream, int64(blocksize))
+	}
 
 	mergedBlocks := merger.GetMergedBlocks()
 
@@ -106,4 +141,5 @@ func Patch(c *cli.Context) {
 	}
 
 	fmt.Println("Total missing bytes:", totalMissingSize)
+	fmt.Println("Time taken:", time.Now().Sub(start_time))
 }

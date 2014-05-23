@@ -89,7 +89,7 @@ func Example() {
 	// This will result in a stream of blocks that match in the local version
 	// to those in the reference
 	// We could do this on two goroutines simultaneously, if we used two identical generators
-	matchStream := comparer.FindMatchingBlocks(
+	matchStream := comparer.StartFindMatchingBlocks(
 		bytes.NewBufferString(LOCAL_VERSION),
 		0,
 		generator,

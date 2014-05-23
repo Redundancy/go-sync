@@ -19,7 +19,7 @@ const (
 )
 
 // If the weak Hash object satisfies this interface, then
-// FindMatchingBlocks will not allocate a circular buffer
+// StartFindMatchingBlocks will not allocate a circular buffer
 type BlockBuffer interface {
 	Write([]byte) (int, error)
 	// the last set of bytes of the size of the circular buffer
@@ -43,11 +43,11 @@ Iterates though comparison looking for blocks that match ones from the index
 it emits each block to be read from the returned channel. Callers should check for
 .Err != nil on the results, in which case reading will end immediately.
 
-FindMatchingBlocks is capable of running asyncronously
+StartFindMatchingBlocks is capable of running asyncronously
 on sub-sections of a larger file. When doing this, you must overlap
 by the block size, and use seperate checksum generators.
 */
-func FindMatchingBlocks(
+func StartFindMatchingBlocks(
 	comparison io.Reader,
 	baseOffset int64,
 	generator *filechecksum.FileChecksumGenerator,
@@ -56,7 +56,7 @@ func FindMatchingBlocks(
 
 	resultStream := make(chan BlockMatchResult)
 
-	go findMatchingBlocks_int(
+	go StartFindMatchingBlocks_int(
 		resultStream,
 		comparison,
 		baseOffset,
@@ -70,7 +70,7 @@ func FindMatchingBlocks(
 /*
 TODO: When matching duplicated blocks, a channel of BlockMatchResult slices would be more efficient
 */
-func findMatchingBlocks_int(
+func StartFindMatchingBlocks_int(
 	results chan<- BlockMatchResult,
 	comparison io.Reader,
 	baseOffset int64,

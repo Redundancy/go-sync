@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"os"
+	"runtime"
 )
 
 const (
@@ -19,6 +20,22 @@ var app *cli.App = cli.NewApp()
 func main() {
 	app.Name = "gosync"
 	app.Usage = "Build indexes, patches, patch files"
+
+	/*
+		// TODO: how to enable profiling?
+		// os.Exit will cause the profile to fail to be written
+
+		app.Flags = []cli.Flag{
+			cli.BoolFlag{"prof", false, "Output a CPU profile as gosync.pprof"},
+		}
+
+		app.Before = func(c *cli.Context) {
+			if c.Bool("prof") {
+
+			}
+		}
+	*/
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	app.Run(os.Args)
 }
 
