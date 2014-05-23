@@ -69,18 +69,9 @@ func Patch(c *cli.Context) {
 	fmt.Println("Finding matching blocks")
 	matchStream := comparer.FindMatchingBlocks(local_file, 0, generator, index)
 
-	/*
-		last := -1
-		for m := range matchStream {
-			if m.BlockIdx != uint(last+1) {
-				fmt.Println("Missing or skip:", last, m.BlockIdx, m.ComparisonOffset)
-			}
-			last = int(m.BlockIdx)
-		}*/
-
 	merger := &comparer.MatchMerger{}
 	fmt.Println("Merging")
-	merger.MergeResults(matchStream, int64(blocksize))
+	merger.StartMergeResultStream(matchStream, int64(blocksize))
 
 	mergedBlocks := merger.GetMergedBlocks()
 
@@ -97,12 +88,12 @@ func Patch(c *cli.Context) {
 	fmt.Println("Total matched bytes:", totalMatchingSize)
 	fmt.Println("Total matched blocks:", matchedBlockCountAfterMerging)
 
-	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount))
+	// TODO: GetMissingBlocks uses the highest index, not the count, this can be pretty confusing
+	// Should clean up this interface to avoid that
+	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
 
-	//fmt.Println("\nMissing:")
 	totalMissingSize := uint64(0)
 	for _, b := range missing {
-		//fmt.Printf("%#v\n", b)
 		totalMissingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
 	}
 

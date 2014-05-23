@@ -99,7 +99,7 @@ func Example() {
 	merger := &comparer.MatchMerger{}
 
 	// Combine adjacent blocks. If finding concurrently, call once per stream
-	merger.MergeResults(matchStream, BLOCK_SIZE)
+	merger.StartMergeResultStream(matchStream, BLOCK_SIZE)
 
 	// a sorted list of ranges of blocks that match between the reference and the local version
 	matchingBlockRanges := merger.GetMergedBlocks()

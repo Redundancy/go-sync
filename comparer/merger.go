@@ -123,7 +123,7 @@ func (merger *MatchMerger) merge(block1, block2 *BlockSpan, blockSize int64) {
 
 // Can be used on multiple streams of results simultaneously
 // starts working asyncronously, call from the initiating goroutine
-func (merger *MatchMerger) MergeResults(
+func (merger *MatchMerger) StartMergeResultStream(
 	resultStream <-chan BlockMatchResult,
 	blockSize int64,
 ) {
@@ -266,6 +266,7 @@ func (merger *MatchMerger) GetMergedBlocks() (sorted BlockSpanList) {
 }
 
 // Creates a list of spans that are missing.
+// note that maxBlock is blockCount-1
 func (l BlockSpanList) GetMissingBlocks(maxBlock uint) (sorted BlockSpanList) {
 	// it's difficult to know how many spans we will need
 	sorted = make(BlockSpanList, 0, maxBlock/4)

@@ -10,7 +10,7 @@ func TestMergeAdjacentBlocksAfter(t *testing.T) {
 
 	mergeChan := make(chan BlockMatchResult)
 	merger := &MatchMerger{}
-	merger.MergeResults(mergeChan, BLOCK_SIZE)
+	merger.StartMergeResultStream(mergeChan, BLOCK_SIZE)
 
 	mergeChan <- BlockMatchResult{
 		ComparisonOffset: 0,
@@ -40,7 +40,7 @@ func TestMergeAdjacentBlocksBefore(t *testing.T) {
 
 	mergeChan := make(chan BlockMatchResult)
 	merger := &MatchMerger{}
-	merger.MergeResults(mergeChan, BLOCK_SIZE)
+	merger.StartMergeResultStream(mergeChan, BLOCK_SIZE)
 
 	mergeChan <- BlockMatchResult{
 		ComparisonOffset: BLOCK_SIZE,
@@ -75,7 +75,7 @@ func TestMergeAdjacentBlocksBetween(t *testing.T) {
 
 	mergeChan := make(chan BlockMatchResult)
 	merger := &MatchMerger{}
-	merger.MergeResults(mergeChan, BLOCK_SIZE)
+	merger.StartMergeResultStream(mergeChan, BLOCK_SIZE)
 
 	mergeChan <- BlockMatchResult{
 		ComparisonOffset: 2 * BLOCK_SIZE,
@@ -189,7 +189,7 @@ func TestDuplicatedReferenceBlocks(t *testing.T) {
 
 	mergeChan := make(chan BlockMatchResult)
 	merger := &MatchMerger{}
-	merger.MergeResults(mergeChan, BLOCK_SIZE)
+	merger.StartMergeResultStream(mergeChan, BLOCK_SIZE)
 
 	// When we find multiple strong matches, we send each of them
 	mergeChan <- BlockMatchResult{
@@ -224,7 +224,7 @@ func TestDuplicatedLocalBlocks(t *testing.T) {
 
 	mergeChan := make(chan BlockMatchResult)
 	merger := &MatchMerger{}
-	merger.MergeResults(mergeChan, BLOCK_SIZE)
+	merger.StartMergeResultStream(mergeChan, BLOCK_SIZE)
 
 	// When we find multiple strong matches, we send each of them
 	mergeChan <- BlockMatchResult{
@@ -260,7 +260,7 @@ func TestDoublyDuplicatedBlocks(t *testing.T) {
 
 	mergeChan := make(chan BlockMatchResult)
 	merger := &MatchMerger{}
-	merger.MergeResults(mergeChan, BLOCK_SIZE)
+	merger.StartMergeResultStream(mergeChan, BLOCK_SIZE)
 
 	// When we find multiple strong matches, we send each of them
 	mergeChan <- BlockMatchResult{
@@ -307,7 +307,7 @@ func TestBlockWithinSpan(t *testing.T) {
 
 	mergeChan := make(chan BlockMatchResult)
 	merger := &MatchMerger{}
-	merger.MergeResults(mergeChan, BLOCK_SIZE)
+	merger.StartMergeResultStream(mergeChan, BLOCK_SIZE)
 
 	mergeChan <- BlockMatchResult{
 		ComparisonOffset: 0,
