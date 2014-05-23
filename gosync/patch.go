@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/comparer"
@@ -21,9 +22,7 @@ func init() {
 			
 			`,
 			Action: Patch,
-			Flags: []cli.Flag{
-				cli.IntFlag{"blocksize", DEFAULT_BLOCK_SIZE, "The block size to use for the gosync file"},
-			},
+			Flags:  []cli.Flag{},
 		},
 	)
 }
@@ -31,9 +30,6 @@ func init() {
 func Patch(c *cli.Context) {
 	local_filename := c.Args()[0]
 	reference_filename := c.Args()[1]
-
-	blocksize := uint(c.Int("blocksize"))
-	generator := filechecksum.NewFileChecksumGenerator(blocksize)
 
 	local_file := openFileAndHandleError(local_filename)
 
@@ -43,6 +39,7 @@ func Patch(c *cli.Context) {
 
 	defer local_file.Close()
 
+	var blocksize uint32
 	reference_file := openFileAndHandleError(reference_filename)
 
 	if reference_file == nil {
@@ -51,7 +48,18 @@ func Patch(c *cli.Context) {
 
 	defer reference_file.Close()
 
+	e := binary.Read(reference_file, binary.LittleEndian, &blocksize)
+
+	if e != nil {
+		fmt.Printf("Error loading index: %v", e)
+		os.Exit(1)
+	}
+
+	fmt.Println("Blocksize: ", blocksize)
+	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
+
 	fmt.Println("Loading checksums")
+
 	readChunks, err := chunks.LoadChecksumsFromReader(
 		reference_file,
 		generator.WeakRollingHash.Size(),
@@ -98,16 +106,4 @@ func Patch(c *cli.Context) {
 	}
 
 	fmt.Println("Total missing bytes:", totalMissingSize)
-}
-
-func openFileAndHandleError(filename string) (f *os.File) {
-	var err error
-	f, err = os.Open(filename)
-
-	if err != nil {
-		f = nil
-		handleFileError(filename, err)
-	}
-
-	return
 }

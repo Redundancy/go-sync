@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/codegangsta/cli"
@@ -25,8 +26,8 @@ func init() {
 
 func Build(c *cli.Context) {
 	filename := c.Args()[0]
-	blocksize := uint(c.Int("blocksize"))
-	generator := filechecksum.NewFileChecksumGenerator(blocksize)
+	blocksize := uint32(c.Int("blocksize"))
+	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
 
 	inputFile, err := os.Open(filename)
 
@@ -54,6 +55,9 @@ func Build(c *cli.Context) {
 
 	defer outputFile.Close()
 
+	// Embed the blocksize as a uint32 at the front
+	binary.Write(outputFile, binary.LittleEndian, &blocksize)
+
 	// TODO: write the blocksize first
 	//outputFile.Write(binary.LittleEndian.)
 	_, err = generator.GenerateChecksums(inputFile, outputFile)
@@ -66,31 +70,5 @@ func Build(c *cli.Context) {
 			err,
 		)
 		os.Exit(2)
-	}
-}
-
-func handleFileError(filename string, err error) {
-	switch {
-	case os.IsNotExist(err):
-		fmt.Fprintf(
-			os.Stderr,
-			"Could not find %v: %v\n",
-			filename,
-			err,
-		)
-	case os.IsPermission(err):
-		fmt.Fprintf(
-			os.Stderr,
-			"Could not open %v (permission denied): %v\n",
-			filename,
-			err,
-		)
-	default:
-		fmt.Fprintf(
-			os.Stderr,
-			"Unknown error opening %v: %v\n",
-			filename,
-			err,
-		)
 	}
 }
