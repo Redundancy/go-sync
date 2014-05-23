@@ -44,9 +44,11 @@ After getting on-disk patching working, the next big thing will be to do an http
 ### Testing
 
 #### Unit tests
-go test github.com/Redundancy/go-sync/...
+
+    go test github.com/Redundancy/go-sync/...
 
 #### Commandline & files
-go build github.com/Redundancy/go-sync/gosync
-gosync b filenameToPatchTo
-gosync p filenameToPatchFrom filenameToPatchTo.gosync
+
+	go build github.com/Redundancy/go-sync/gosync
+	gosync b filenameToPatchTo
+	gosync p filenameToPatchFrom filenameToPatchTo.gosync
