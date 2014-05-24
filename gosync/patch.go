@@ -76,6 +76,7 @@ func Patch(c *cli.Context) {
 	}
 
 	index := sync_index.MakeChecksumIndex(readChunks)
+	fmt.Println("Weak hash count:", index.WeakCount())
 
 	fi, err := local_file.Stat()
 

@@ -45,6 +45,10 @@ func MakeChecksumIndex(checksums []chunks.ChunkChecksum) *ChecksumIndex {
 	return n
 }
 
+func (index *ChecksumIndex) WeakCount() int {
+	return len(index.weakChecksumLookup)
+}
+
 func (index *ChecksumIndex) FindWeakChecksumInIndex(weak []byte) StrongChecksumList {
 	return index.weakChecksumLookup[string(weak)]
 }
