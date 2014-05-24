@@ -9,6 +9,12 @@ import (
 	"testing"
 )
 
+func TestFULL_BYTES_16Value(t *testing.T) {
+	if FULL_BYTES_16 != 65535 {
+		t.Errorf("FULL_BYTES_16 does not fill 15 bits of 1 %v", FULL_BYTES_16)
+	}
+}
+
 func TestThatRollsumSatisfiesHashInterface(t *testing.T) {
 	var i hash.Hash = NewRollsum16(10)
 	i.Reset()
@@ -115,6 +121,23 @@ func BenchmarkRollsum(b *testing.B) {
 	r := NewRollsum16(100)
 	buffer := make([]byte, 100)
 	b.ReportAllocs()
+	b.SetBytes(int64(len(buffer)))
+	checksum := make([]byte, 16)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		r.Write(buffer)
+		r.Sum(checksum)
+		checksum = checksum[:0]
+	}
+	b.StopTimer()
+}
+
+func BenchmarkRollsum8096(b *testing.B) {
+	r := NewRollsum16(8096)
+	buffer := make([]byte, 8096)
+	b.ReportAllocs()
+	b.SetBytes(int64(len(buffer)))
 	checksum := make([]byte, 16)
 
 	b.StartTimer()
@@ -131,6 +154,7 @@ func BenchmarkRollsum16Base(b *testing.B) {
 	buffer := make([]byte, 100)
 	checksum := make([]byte, 16)
 	b.ReportAllocs()
+	b.SetBytes(int64(len(buffer)))
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -146,6 +170,7 @@ func BenchmarkMD5(b *testing.B) {
 	buffer := make([]byte, 100)
 	checksum := make([]byte, 32)
 	b.ReportAllocs()
+	b.SetBytes(int64(len(buffer)))
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -161,6 +186,7 @@ func BenchmarkMD5WithoutClear(b *testing.B) {
 	hash := md5.New()
 	buffer := make([]byte, 100)
 	b.ReportAllocs()
+	b.SetBytes(int64(len(buffer)))
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -176,6 +202,7 @@ func BenchmarkIncrementalRollsum(b *testing.B) {
 	r := NewRollsum16(100)
 	buffer := make([]byte, 100)
 	r.Write(buffer)
+	b.SetBytes(1)
 
 	b.ReportAllocs()
 	checksum := make([]byte, 16)
@@ -196,6 +223,7 @@ func BenchmarkIncrementalRollsumWithC2(b *testing.B) {
 	const BLOCK_SIZE = 100
 	r := NewRollsum16Base(BLOCK_SIZE)
 	buffer := make([]byte, BLOCK_SIZE)
+	b.SetBytes(1)
 	cbuffer := circularbuffer.MakeC2Buffer(BLOCK_SIZE)
 
 	r.AddBytes(buffer)

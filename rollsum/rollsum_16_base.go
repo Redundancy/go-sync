@@ -5,7 +5,7 @@ import (
 )
 
 // 16 bits full of 1s
-const FULL_BYTES_16 = (2 ^ 16) - 1
+const FULL_BYTES_16 = (1 << 16) - 1
 
 // Rollsum16Base decouples the rollsum algorithm from the implementation of
 // hash.Hash and the storage the rolling checksum window
