@@ -41,6 +41,19 @@ The rolling checksum should be pretty performant in all forms, as long as it can
 
 After getting on-disk patching working, the next big thing will be to do an http/s blocksource.
 
+### Performance
+NB: Based on very rough local testing
+
+We can do about 16 MB/s of rollsum checksums (with a checksum per byte). In comparison, we do ~300 MB/s with a checksum per block of over 100 bytes. (See the rollsum benchmarks)  
+
+However, this isn't the full picture when it comes to evaluating a file:
+
+When the file is very similar to the reference file (lots of matches) we get much better performance - this is because we're hitting closer to the 300 MB/s hash performance, and only looking up 1 weak checksum per block.
+
+When the file isn't very similar, things take much longer (50s vs 200ms) in a comparison that I did... since we're not finding many matching blocks, it's not the merging (that would be more of an issue with the similar file). The file was ~8 MB, so we weren't maxing out at 16 MB/s, and the disk wasn't being taxed at the time.
+
+The conclusion is that the index lookups are likely to be the significant bottleneck in the comparison, even when allowing multiple threads to read the map simultaneously. However, it's quite difficult to benchmark the index without semi-real behaviour of things like the checksums to see where it's worth focussing effort.
+
 ### Testing
 
 #### Unit tests
