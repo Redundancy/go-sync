@@ -130,15 +130,17 @@ func StartFindMatchingBlocks_int(
 			// duplicated in the reference.
 			// since we care about finding all the blocks in the reference,
 			// we must report all of them
+			off := i + baseOffset
 			for _, strongMatch := range strongList {
 				results <- BlockMatchResult{
-					ComparisonOffset: i + baseOffset,
+					ComparisonOffset: off,
 					BlockIdx:         strongMatch.ChunkOffset,
 				}
 			}
 
-			if len(strongList) != 0 {
+			if len(strongList) > 0 {
 				if next == READ_NONE {
+					// found the match at the end, so exit
 					break
 				}
 				// No point looking for a match that overlaps this block

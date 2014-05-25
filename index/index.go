@@ -5,11 +5,23 @@ then check if there is a strong checksum that matches.
 
 It also allows lookups in terms of block offsets, so that upon finding a match, you can more efficiently
 check if the next block follows it.
+
+The index structure does not lend itself to being an interface - the pattern of taking the result of looking for
+the weak checksum and looking up the strong checksum in that requires us to return an object matching an interface which
+both packages must know about.
+
+Here is a potential alternative:
+Have FindWeakChecksum return an interface{}. If nil, the weak checksum was not found.
+Have FindStrongChecksum accept an interface{}. This should be the value from the weak checksum lookup.
+
+This allows the implementation to rely on a previously generated value, without the users knowing what it is.
+This breaks the dependency that requires so many packages to import index.
 */
 package index
 
 import (
 	"bytes"
+	"encoding/binary"
 	"github.com/Redundancy/go-sync/chunks"
 	"sort"
 )
@@ -17,7 +29,7 @@ import (
 type ChecksumIndex struct {
 	BlockCount int
 	// Find a matching weak checksum, see if there's a matching strong checksum
-	weakChecksumLookup map[string]StrongChecksumList
+	weakChecksumLookup map[uint32]StrongChecksumList
 }
 
 // Builds an index in which chunks can be found, with their corresponding offsets
@@ -25,11 +37,11 @@ type ChecksumIndex struct {
 func MakeChecksumIndex(checksums []chunks.ChunkChecksum) *ChecksumIndex {
 	n := &ChecksumIndex{
 		BlockCount:         len(checksums),
-		weakChecksumLookup: make(map[string]StrongChecksumList, len(checksums)),
+		weakChecksumLookup: make(map[uint32]StrongChecksumList, len(checksums)),
 	}
 
 	for _, chunk := range checksums {
-		weakChecksumAsString := string(chunk.WeakChecksum)
+		weakChecksumAsString := binary.LittleEndian.Uint32(chunk.WeakChecksum)
 
 		n.weakChecksumLookup[weakChecksumAsString] = append(
 			n.weakChecksumLookup[weakChecksumAsString],
@@ -50,7 +62,7 @@ func (index *ChecksumIndex) WeakCount() int {
 }
 
 func (index *ChecksumIndex) FindWeakChecksumInIndex(weak []byte) StrongChecksumList {
-	return index.weakChecksumLookup[string(weak)]
+	return index.weakChecksumLookup[binary.LittleEndian.Uint32(weak)]
 }
 
 type StrongChecksumList []chunks.ChunkChecksum

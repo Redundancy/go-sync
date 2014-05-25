@@ -8,8 +8,8 @@ import (
 func TestMakeIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, []byte("a"), []byte("b")},
-			{1, []byte("b"), []byte("c")},
+			{0, []byte("aaaa"), []byte("b")},
+			{1, []byte("bbbb"), []byte("c")},
 		},
 	)
 
@@ -21,13 +21,13 @@ func TestMakeIndex(t *testing.T) {
 func TestFindWeakInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, []byte("a"), []byte("b")},
-			{1, []byte("b"), []byte("c")},
-			{2, []byte("b"), []byte("d")},
+			{0, []byte("aaaa"), []byte("b")},
+			{1, []byte("bbbb"), []byte("c")},
+			{2, []byte("bbbb"), []byte("d")},
 		},
 	)
 
-	result := i.FindWeakChecksumInIndex([]byte("b"))
+	result := i.FindWeakChecksumInIndex([]byte("bbbb"))
 
 	if result == nil {
 		t.Error("Did not find lookfor in the index")
@@ -41,14 +41,14 @@ func TestFindWeakInIndex(t *testing.T) {
 func TestFindStrongInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, []byte("a"), []byte("b")},
-			{1, []byte("b"), []byte("c")},
-			{2, []byte("b"), []byte("d")},
+			{0, []byte("aaaa"), []byte("b")},
+			{1, []byte("bbbb"), []byte("c")},
+			{2, []byte("bbbb"), []byte("d")},
 		},
 	)
 
 	// builds upon TestFindWeakInIndex
-	result := i.FindWeakChecksumInIndex([]byte("b"))
+	result := i.FindWeakChecksumInIndex([]byte("bbbb"))
 	strongs := result.FindStrongChecksum([]byte("c"))
 
 	if len(strongs) != 1 {
@@ -61,14 +61,14 @@ func TestFindStrongInIndex(t *testing.T) {
 func TestNotFoundStrongInIndexAtEnd(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, []byte("a"), []byte("b")},
-			{1, []byte("b"), []byte("c")},
-			{2, []byte("b"), []byte("d")},
+			{0, []byte("aaaa"), []byte("b")},
+			{1, []byte("bbbb"), []byte("c")},
+			{2, []byte("bbbb"), []byte("d")},
 		},
 	)
 
 	// builds upon TestFindWeakInIndex
-	result := i.FindWeakChecksumInIndex([]byte("b"))
+	result := i.FindWeakChecksumInIndex([]byte("bbbb"))
 	strongs := result.FindStrongChecksum([]byte("e"))
 
 	if len(strongs) != 0 {
@@ -82,15 +82,15 @@ func TestNotFoundStrongInIndexInCenter(t *testing.T) {
 
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, []byte("a"), []byte("b")},
-			{1, []byte("b"), []byte("c")},
-			{2, []byte("b"), []byte("d")},
-			{3, []byte("b"), []byte("f")},
+			{0, []byte("aaaa"), []byte("b")},
+			{1, []byte("bbbb"), []byte("c")},
+			{2, []byte("bbbb"), []byte("d")},
+			{3, []byte("bbbb"), []byte("f")},
 		},
 	)
 
 	// builds upon TestFindWeakInIndex
-	result := i.FindWeakChecksumInIndex([]byte("b"))
+	result := i.FindWeakChecksumInIndex([]byte("bbbb"))
 	strongs := result.FindStrongChecksum([]byte("e"))
 
 	if len(strongs) != 0 {
@@ -101,15 +101,15 @@ func TestNotFoundStrongInIndexInCenter(t *testing.T) {
 func TestFindDuplicatedBlocksInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, []byte("a"), []byte("b")},
-			{1, []byte("b"), []byte("c")},
-			{3, []byte("b"), []byte("c")},
-			{2, []byte("b"), []byte("d")},
+			{0, []byte("aaaa"), []byte("b")},
+			{1, []byte("bbbb"), []byte("c")},
+			{3, []byte("bbbb"), []byte("c")},
+			{2, []byte("bbbb"), []byte("d")},
 		},
 	)
 
 	// builds upon TestFindWeakInIndex
-	result := i.FindWeakChecksumInIndex([]byte("b"))
+	result := i.FindWeakChecksumInIndex([]byte("bbbb"))
 	strongs := result.FindStrongChecksum([]byte("c"))
 
 	if len(strongs) != 2 {
@@ -130,13 +130,13 @@ func TestFindDuplicatedBlocksInIndex(t *testing.T) {
 func TestFindTwoDuplicatedBlocksInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{1, []byte("b"), []byte("c")},
-			{2, []byte("b"), []byte("c")},
+			{1, []byte("bbbb"), []byte("c")},
+			{2, []byte("bbbb"), []byte("c")},
 		},
 	)
 
 	// builds upon TestFindWeakInIndex
-	result := i.FindWeakChecksumInIndex([]byte("b"))
+	result := i.FindWeakChecksumInIndex([]byte("bbbb"))
 	strongs := result.FindStrongChecksum([]byte("c"))
 
 	if len(strongs) != 2 {
