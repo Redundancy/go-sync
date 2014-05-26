@@ -44,15 +44,19 @@ After getting on-disk patching working, the next big thing will be to do an http
 ### Performance
 NB: Based on very rough local testing
 
-We can do about 16 MB/s of rollsum checksums (with a checksum per byte). In comparison, we do ~300 MB/s with a checksum per block of over 100 bytes. (See the rollsum benchmarks)  
+We can do about 16 MB/s of rollsum checksums (with a checksum per byte). In comparison, we do ~300 MB/s with a checksum per block of over 100 bytes. (See the rollsum benchmarks). With MD5, we peak at 402.63 MB/s for a whole file (no sums).
 
-However, this isn't the full picture when it comes to evaluating a file:
+On large files, that means that the performance of MD5 is most likely to be limited by the IO of the disks (unless you get something like 2-3 SSDs on RAID 0). With very similar files that match well, we can potentially achieve similar performance with block by block rolling checksum comparisons (which can also be run multi-core).
 
-When the file is very similar to the reference file (lots of matches) we get much better performance - this is because we're hitting closer to the 300 MB/s hash performance, and only looking up 1 weak checksum per block.
+So if we assume a 16 GB payload, and give ourselves the freebie of it being one large contiguous file for faster reads, we would potentially check if it was identical to a previous one in about 40 seconds, given sufficient disk transfer, or about 4-8 minutes on a more normal setup.
 
-When the file isn't very similar, things take much longer (50s vs 200ms) in a comparison that I did... since we're not finding many matching blocks, it's not the merging (that would be more of an issue with the similar file). The file was ~8 MB, so we weren't maxing out at 16 MB/s, and the disk wasn't being taxed at the time.
+This does lead me to think that if you expect to find that your version of files locally is mostly the same as your reference, you should expect to be able to run the full comparison about as quickly as anything else. 
 
-The conclusion is that the index lookups are likely to be the significant bottleneck in the comparison, even when allowing multiple threads to read the map simultaneously. However, it's quite difficult to benchmark the index without semi-real behaviour of things like the checksums to see where it's worth focussing effort.
+However, back to practical reality:
+
+An optimal byte by byte comparison (no expected weak matches, very small index) hits about 8 MB/s (per thread). This is slower than the 16 MB/s of the checksum, but it's not horrible considering that it does need to do a lot of extra work.
+
+On an 8 MB file which has very few matches, once I throw 4 threads at it and make sure to use a buffered reader, we're managing 1s for the comparison. The buffered reader is important to use the disks well and avoid thread contention on the file lock. The differences in performance are likely accounted for between the io and the index.
 
 ### Testing
 

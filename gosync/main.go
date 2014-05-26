@@ -7,12 +7,15 @@ package main
 import (
 	"fmt"
 	"github.com/codegangsta/cli"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 )
 
 const (
-	DEFAULT_BLOCK_SIZE = 8096
+	DEFAULT_BLOCK_SIZE = 8192
 )
 
 var app *cli.App = cli.NewApp()
@@ -36,6 +39,9 @@ func main() {
 		}
 	*/
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	app.Run(os.Args)
 }
 

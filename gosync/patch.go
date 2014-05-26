@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"github.com/Redundancy/go-sync/chunks"
@@ -12,6 +13,11 @@ import (
 	"os"
 	"runtime"
 	"time"
+)
+
+const (
+	KB = 1024
+	MB = 1024 * KB
 )
 
 func init() {
@@ -108,7 +114,11 @@ func Patch(c *cli.Context) {
 			offset -= int64(blocksize)
 		}
 
-		sectionReader := io.NewSectionReader(local_file, offset, sectionSize)
+		sectionReader := bufio.NewReaderSize(
+			io.NewSectionReader(local_file, offset, sectionSize),
+			MB,
+		)
+
 		sectionGenerator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
 
 		matchStream := comparer.StartFindMatchingBlocks(

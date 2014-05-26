@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"github.com/Redundancy/go-sync/circularbuffer"
+	"github.com/Redundancy/go-sync/util/readers"
 	"hash"
 	"io"
 	"testing"
@@ -240,5 +241,14 @@ func BenchmarkIncrementalRollsumWithC2(b *testing.B) {
 		r.RemoveBytes(cbuffer.Evicted())
 		r.GetSum(checksum)
 	}
+	b.StopTimer()
+}
+
+func BenchmarkMD5Speed(b *testing.B) {
+	m := md5.New()
+	b.SetBytes(1)
+
+	b.StartTimer()
+	io.Copy(m, readers.ZeroReader(b.N))
 	b.StopTimer()
 }
