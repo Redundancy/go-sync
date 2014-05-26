@@ -6,9 +6,9 @@ package comparer
 
 import (
 	"fmt"
+	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/circularbuffer"
 	"github.com/Redundancy/go-sync/filechecksum"
-	"github.com/Redundancy/go-sync/index"
 	"io"
 )
 
@@ -38,6 +38,11 @@ type BlockMatchResult struct {
 	BlockIdx uint
 }
 
+type Index interface {
+	FindWeakChecksum2(chk []byte) interface{}
+	FindStrongChecksum2(chk []byte, weak interface{}) []chunks.ChunkChecksum
+}
+
 /*
 Iterates though comparison looking for blocks that match ones from the index
 it emits each block to be read from the returned channel. Callers should check for
@@ -51,7 +56,7 @@ func StartFindMatchingBlocks(
 	comparison io.Reader,
 	baseOffset int64,
 	generator *filechecksum.FileChecksumGenerator,
-	referenceIndex *index.ChecksumIndex,
+	referenceIndex Index,
 ) <-chan BlockMatchResult {
 
 	resultStream := make(chan BlockMatchResult)
@@ -75,7 +80,7 @@ func StartFindMatchingBlocks_int(
 	comparison io.Reader,
 	baseOffset int64,
 	generator *filechecksum.FileChecksumGenerator,
-	reference *index.ChecksumIndex,
+	reference Index,
 ) {
 	defer close(results)
 
@@ -114,14 +119,14 @@ func StartFindMatchingBlocks_int(
 	for {
 		// look for a weak match
 		generator.WeakRollingHash.GetSum(weaksum)
-		if weakMatchList := reference.FindWeakChecksumInIndex(weaksum); weakMatchList != nil {
+		if weakMatchList := reference.FindWeakChecksum2(weaksum); weakMatchList != nil {
 
 			block = blockMemory.GetBlock()
 
 			strong.Reset()
 			strong.Write(block)
 			strongSum = strong.Sum(strongSum)
-			strongList := weakMatchList.FindStrongChecksum(strongSum)
+			strongList := reference.FindStrongChecksum2(strongSum, weakMatchList)
 
 			// clear the slice
 			strongSum = strongSum[:0]

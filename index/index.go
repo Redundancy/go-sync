@@ -10,9 +10,12 @@ The index structure does not lend itself to being an interface - the pattern of 
 the weak checksum and looking up the strong checksum in that requires us to return an object matching an interface which
 both packages must know about.
 
-Here is a potential alternative:
-Have FindWeakChecksum return an interface{}. If nil, the weak checksum was not found.
-Have FindStrongChecksum accept an interface{}. This should be the value from the weak checksum lookup.
+Here's the interface:
+
+type Index interface {
+	FindWeakChecksum(chk []byte) interface{}
+	FindStrongChecksum(chk []byte, weak interface{}) []chunks.ChunkChecksum
+}
 
 This allows the implementation to rely on a previously generated value, without the users knowing what it is.
 This breaks the dependency that requires so many packages to import index.
@@ -30,6 +33,9 @@ type ChecksumIndex struct {
 	BlockCount int
 	// Find a matching weak checksum, see if there's a matching strong checksum
 	weakChecksumLookup map[uint32]StrongChecksumList
+
+	MaxStrongLength     int
+	AverageStrongLength float32
 }
 
 // Builds an index in which chunks can be found, with their corresponding offsets
@@ -50,9 +56,19 @@ func MakeChecksumIndex(checksums []chunks.ChunkChecksum) *ChecksumIndex {
 
 	}
 
+	sum := 0
+	count := 0
+
 	for _, c := range n.weakChecksumLookup {
 		sort.Sort(c)
+		if len(c) > n.MaxStrongLength {
+			n.MaxStrongLength = len(c)
+		}
+		sum += len(c)
+		count += 1
 	}
+
+	n.AverageStrongLength = float32(sum) / float32(count)
 
 	return n
 }
@@ -63,6 +79,18 @@ func (index *ChecksumIndex) WeakCount() int {
 
 func (index *ChecksumIndex) FindWeakChecksumInIndex(weak []byte) StrongChecksumList {
 	return index.weakChecksumLookup[binary.LittleEndian.Uint32(weak)]
+}
+
+func (index *ChecksumIndex) FindWeakChecksum2(chk []byte) interface{} {
+	return index.FindWeakChecksumInIndex(chk)
+}
+
+func (index *ChecksumIndex) FindStrongChecksum2(chk []byte, weak interface{}) []chunks.ChunkChecksum {
+	if strongList, ok := weak.(StrongChecksumList); ok {
+		return strongList.FindStrongChecksum(chk)
+	} else {
+		return nil
+	}
 }
 
 type StrongChecksumList []chunks.ChunkChecksum
