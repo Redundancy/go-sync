@@ -1,7 +1,6 @@
 package comparer
 
 import (
-	"github.com/petar/GoLLRB/llrb"
 	"testing"
 )
 
@@ -345,45 +344,5 @@ func TestBlockWithinSpan(t *testing.T) {
 	// start and end
 	if merger.startEndBlockMap.Len() != 2 {
 		t.Errorf("Wrong number of entries in the map: %v", merger.startEndBlockMap.Len())
-	}
-}
-
-// Just to test out usage of the LLRB interface and helpers
-func TestLLRB(t *testing.T) {
-	m := &MatchMerger{}
-	m.startEndBlockMap = llrb.New()
-
-	bm := m.startEndBlockMap
-
-	bm.ReplaceOrInsert(
-		BlockSpanStart(
-			BlockSpan{
-				StartBlock: 0,
-				EndBlock:   10,
-			},
-		),
-	)
-
-	bm.ReplaceOrInsert(
-		BlockSpanEnd(
-			BlockSpan{
-				StartBlock: 0,
-				EndBlock:   10,
-			},
-		),
-	)
-
-	i := bm.Get(BlockSpanKey(10))
-
-	var EndBlock uint
-	switch j := i.(type) {
-	case BlockSpanStart:
-		EndBlock = j.EndBlock
-	case BlockSpanEnd:
-		EndBlock = j.EndBlock
-	}
-
-	if EndBlock != 10 {
-		t.Fail()
 	}
 }
