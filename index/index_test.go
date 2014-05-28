@@ -17,8 +17,8 @@ func TestMakeIndex(t *testing.T) {
 		},
 	)
 
-	if len(i.weakChecksumLookup) != 2 {
-		t.Errorf("size of lookup was not expected %v", len(i.weakChecksumLookup))
+	if i.Count != 2 {
+		t.Fatalf("Wrong count on index %v", i.Count)
 	}
 }
 
@@ -39,6 +39,44 @@ func TestFindWeakInIndex(t *testing.T) {
 		t.Errorf("Wrong number of possible matches found: %v", len(result))
 	} else if result[0].ChunkOffset != 1 {
 		t.Errorf("Found chunk had offset %v expected 1", result[0].ChunkOffset)
+	}
+}
+
+func TestWeakNotInIndex(t *testing.T) {
+	i := MakeChecksumIndex(
+		[]chunks.ChunkChecksum{
+			{0, WEAK_A, []byte("b")},
+			{1, WEAK_B, []byte("c")},
+			{2, WEAK_B, []byte("d")},
+		},
+	)
+
+	result := i.FindWeakChecksumInIndex([]byte("afgh"))
+
+	if result != nil {
+		t.Error("Result from FindWeakChecksumInIndex should be nil")
+	}
+
+	result2 := i.FindWeakChecksum2([]byte("afgh"))
+
+	if result2 != nil {
+		t.Errorf("Result from FindWeakChecksum2 should be nil: %#v", result2)
+	}
+}
+
+func TestWeakNotInIndex2(t *testing.T) {
+	i := MakeChecksumIndex(
+		[]chunks.ChunkChecksum{
+			{0, WEAK_A, []byte("b")},
+			{1, WEAK_B, []byte("c")},
+			{2, WEAK_B, []byte("d")},
+		},
+	)
+
+	result := i.FindWeakChecksumInIndex([]byte("llll"))
+
+	if result != nil {
+		t.Error("Result should be nil")
 	}
 }
 
