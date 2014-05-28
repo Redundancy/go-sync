@@ -1,41 +1,75 @@
 package comparer
 
 import (
-	"bytes"
+	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/filechecksum"
-	"github.com/Redundancy/go-sync/indexbuilder"
 	"github.com/Redundancy/go-sync/util/readers"
 	"testing"
 )
 
-func BenchmarkComparison(b *testing.B) {
+var test = []byte{0, 1, 2, 3}
+
+type NegativeWeakIndex struct {
+}
+
+func (i *NegativeWeakIndex) FindWeakChecksum2(chk []byte) interface{} {
+	return nil
+}
+
+func (i *NegativeWeakIndex) FindStrongChecksum2(chk []byte, weak interface{}) []chunks.ChunkChecksum {
+	return nil
+}
+
+type NegativeStrongIndex struct {
+}
+
+func (i *NegativeStrongIndex) FindWeakChecksum2(chk []byte) interface{} {
+	return i
+}
+
+func (i *NegativeStrongIndex) FindStrongChecksum2(chk []byte, weak interface{}) []chunks.ChunkChecksum {
+	return nil
+}
+
+func BenchmarkWeakComparison(b *testing.B) {
 	b.ReportAllocs()
 	b.SetBytes(1)
 
 	const BLOCK_SIZE = 8
-	var err error
-
-	const ORIGINAL_STRING = "abcdefghijklmnop"
-
-	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
 	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
-
-	if err != nil {
-		b.Fatal(err)
-	}
 
 	b.StartTimer()
 
-	results := StartFindMatchingBlocks(
-		readers.NewSizedNonRepeatingSequence(0, int64(b.N+BLOCK_SIZE)),
+	results := (&Comparer{}).StartFindMatchingBlocks(
+		readers.OneReader(b.N+BLOCK_SIZE),
 		0,
 		generator,
-		reference,
+		&NegativeWeakIndex{},
 	)
 
 	for _, ok := <-results; ok; {
+	}
 
+	b.StopTimer()
+}
+
+func BenchmarkStrongComparison(b *testing.B) {
+	b.ReportAllocs()
+	b.SetBytes(1)
+
+	const BLOCK_SIZE = 8
+	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
+
+	b.StartTimer()
+
+	results := (&Comparer{}).StartFindMatchingBlocks(
+		readers.OneReader(b.N+BLOCK_SIZE),
+		0,
+		generator,
+		&NegativeStrongIndex{},
+	)
+
+	for _, ok := <-results; ok; {
 	}
 
 	b.StopTimer()

@@ -70,7 +70,7 @@ func TestDetectsPrependedContent(t *testing.T) {
 
 	modifiedContent := bytes.NewBufferString(PREPENDED_STRING)
 
-	results := StartFindMatchingBlocks(
+	results := (&Comparer{}).StartFindMatchingBlocks(
 		modifiedContent,
 		0,
 		generator,
@@ -105,7 +105,7 @@ func TestDetectsInjectedContent(t *testing.T) {
 
 	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
 
-	results := StartFindMatchingBlocks(
+	results := (&Comparer{}).StartFindMatchingBlocks(
 		modifiedContent,
 		0,
 		generator,
@@ -139,7 +139,7 @@ func TestDetectsAppendedContent(t *testing.T) {
 
 	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
 
-	results := StartFindMatchingBlocks(
+	results := (&Comparer{}).StartFindMatchingBlocks(
 		modifiedContent,
 		0,
 		generator,
@@ -176,7 +176,7 @@ func TestDetectsModifiedContent(t *testing.T) {
 
 	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
 
-	results := StartFindMatchingBlocks(
+	results := (&Comparer{}).StartFindMatchingBlocks(
 		modifiedContent,
 		0,
 		generator,
@@ -210,7 +210,7 @@ func TestDetectsPartialBlockAtEnd(t *testing.T) {
 
 	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
 
-	results := StartFindMatchingBlocks(
+	results := (&Comparer{}).StartFindMatchingBlocks(
 		modifiedContent,
 		0,
 		generator,
@@ -244,7 +244,7 @@ func TestMultipleResultsForDuplicatedBlocks(t *testing.T) {
 
 	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
 
-	results := StartFindMatchingBlocks(
+	results := (&Comparer{}).StartFindMatchingBlocks(
 		modifiedContent,
 		0,
 		generator,

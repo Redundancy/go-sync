@@ -10,6 +10,7 @@ import (
 	"github.com/Redundancy/go-sync/circularbuffer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"io"
+	"sync/atomic"
 )
 
 const (
@@ -52,7 +53,14 @@ StartFindMatchingBlocks is capable of running asyncronously
 on sub-sections of a larger file. When doing this, you must overlap
 by the block size, and use seperate checksum generators.
 */
-func StartFindMatchingBlocks(
+
+type Comparer struct {
+	Comparisons    int64
+	WeakHashHits   int64
+	StrongHashHits int64
+}
+
+func (c *Comparer) StartFindMatchingBlocks(
 	comparison io.Reader,
 	baseOffset int64,
 	generator *filechecksum.FileChecksumGenerator,
@@ -61,7 +69,7 @@ func StartFindMatchingBlocks(
 
 	resultStream := make(chan BlockMatchResult)
 
-	go StartFindMatchingBlocks_int(
+	go c.startFindMatchingBlocks_int(
 		resultStream,
 		comparison,
 		baseOffset,
@@ -75,7 +83,7 @@ func StartFindMatchingBlocks(
 /*
 TODO: When matching duplicated blocks, a channel of BlockMatchResult slices would be more efficient
 */
-func StartFindMatchingBlocks_int(
+func (c *Comparer) startFindMatchingBlocks_int(
 	results chan<- BlockMatchResult,
 	comparison io.Reader,
 	baseOffset int64,
@@ -117,9 +125,13 @@ func StartFindMatchingBlocks_int(
 
 	//ReadLoop:
 	for {
+
+		atomic.AddInt64(&c.Comparisons, 1)
+
 		// look for a weak match
 		generator.WeakRollingHash.GetSum(weaksum)
 		if weakMatchList := reference.FindWeakChecksum2(weaksum); weakMatchList != nil {
+			atomic.AddInt64(&c.WeakHashHits, 1)
 
 			block = blockMemory.GetBlock()
 
@@ -144,6 +156,7 @@ func StartFindMatchingBlocks_int(
 			}
 
 			if len(strongList) > 0 {
+				atomic.AddInt64(&c.StrongHashHits, 1)
 				if next == READ_NONE {
 					// found the match at the end, so exit
 					break
