@@ -56,7 +56,21 @@ However, back to practical reality:
 
 An optimal byte by byte comparison (no expected weak matches, very small index) hits about 8 MB/s (per thread). This is slower than the 16 MB/s of the checksum, but it's not horrible considering that it does need to do a lot of extra work.
 
-On an 8 MB file which has very few matches, once I throw 4 threads at it and make sure to use a buffered reader, we're managing 1s for the comparison. The buffered reader is important to use the disks well and avoid thread contention on the file lock. The differences in performance are likely accounted for between the io and the index.
+On an 8 MB file which has very few matches, once I throw 4 threads at it and make sure to use a buffered reader, we're managing 1s for the comparison. The buffered reader is important to use the disks well and avoid thread contention on the file lock.
+
+#### Some numbers:
+Budget for 8 MB/s byte by byte comparison on single thread: 120ns
+
+Current Benchmark State:
+1. Checksum: 62.7 ns
+1. Comparison (No index lookup)
+ 1. Weak Rejection: 85.2 ns
+ 1. Strong Rejection: 458 ns (MD5: 391 ns)
+1. Index Lookup: 70 ns + (for reject)
+
+A brief profile indicates that MD5.Write is ~50% of the CPU time. We can't speed that one up, but we might be able to reduce the frequency with which it's called. 
+
+Rollsum16 rejects ~99% of blocks, but incorrectly assumes a hit 99.9% of the remaining time. Small, cheap improvements here can potentially save a lot of MD5-ing. 
 
 ### Testing
 
