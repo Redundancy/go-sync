@@ -346,3 +346,27 @@ func TestBlockWithinSpan(t *testing.T) {
 		t.Errorf("Wrong number of entries in the map: %v", merger.startEndBlockMap.Len())
 	}
 }
+
+func TestNilBlockSpanList(t *testing.T) {
+	s := BlockSpanList(nil)
+
+	missing := s.GetMissingBlocks(1)
+
+	if missing == nil {
+		t.Fail()
+	}
+
+	if len(missing) == 0 {
+		t.Fatal("missing should not be empty")
+	}
+
+	missingItem := missing[0]
+
+	if missingItem.StartBlock != 0 {
+		t.Errorf("Wrong startblock: %v", missingItem.StartBlock)
+	}
+	if missingItem.EndBlock != 1 {
+		t.Errorf("Wrong endblock: %v", missingItem.EndBlock)
+	}
+
+}

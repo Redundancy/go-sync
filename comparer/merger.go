@@ -131,6 +131,10 @@ func (merger *MatchMerger) StartMergeResultStream(
 	// to ensure that it has happened before wait is called
 	merger.wait.Add(1)
 
+	if merger.startEndBlockMap == nil {
+		merger.startEndBlockMap = llrb.New()
+	}
+
 	// used by the llrb iterator to signal that it found/didn't find
 	// an existing key on or spanning the given block
 	//foundExisting := make(chan bool)
@@ -145,10 +149,6 @@ func (merger *MatchMerger) StartMergeResultStream(
 
 			merger.Lock()
 			merger.blockCount += 1
-
-			if merger.startEndBlockMap == nil {
-				merger.startEndBlockMap = llrb.New()
-			}
 
 			blockID := result.BlockIdx
 			preceeding := merger.startEndBlockMap.Get(BlockSpanKey(blockID - 1))
@@ -269,7 +269,7 @@ func (merger *MatchMerger) GetMergedBlocks() (sorted BlockSpanList) {
 // note that maxBlock is blockCount-1
 func (l BlockSpanList) GetMissingBlocks(maxBlock uint) (sorted BlockSpanList) {
 	// it's difficult to know how many spans we will need
-	sorted = make(BlockSpanList, 0, maxBlock/4)
+	sorted = make(BlockSpanList, 0)
 
 	lastBlockSpanIndex := -1
 	for _, blockSpan := range l {
@@ -286,7 +286,15 @@ func (l BlockSpanList) GetMissingBlocks(maxBlock uint) (sorted BlockSpanList) {
 		lastBlockSpanIndex = int(blockSpan.EndBlock)
 	}
 
-	if uint(lastBlockSpanIndex) < maxBlock {
+	if lastBlockSpanIndex == -1 {
+		sorted = append(
+			sorted,
+			BlockSpan{
+				StartBlock: 0,
+				EndBlock:   maxBlock,
+			},
+		)
+	} else if uint(lastBlockSpanIndex) < maxBlock {
 		sorted = append(
 			sorted,
 			BlockSpan{
