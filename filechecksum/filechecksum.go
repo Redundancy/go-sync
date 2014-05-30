@@ -15,16 +15,21 @@ import (
 
 // Rsync swapped to this after version 30
 // this is a factory function, because we don't actually want to share hash state
-var DefaultStrongHashGenerator = func() hash.Hash { return md5.New() }
+var DefaultStrongHashGenerator = func() hash.Hash {
+	return md5.New()
+}
 
 // We provide an overall hash of individual files
-var DefaultFileHashGenerator = func() hash.Hash { return md5.New() }
+var DefaultFileHashGenerator = func() hash.Hash {
+	return md5.New()
+}
 
 // Uses all default hashes (MD5 & rollsum16)
 func NewFileChecksumGenerator(blocksize uint) *FileChecksumGenerator {
 	return &FileChecksumGenerator{
-		BlockSize:        blocksize,
-		WeakRollingHash:  rollsum.NewRollsum16Base(blocksize),
+		BlockSize:       blocksize,
+		WeakRollingHash: rollsum.NewRollsum32Base(blocksize),
+		//WeakRollingHash:  rollsum.NewRollsum16Base(blocksize),
 		StrongHash:       DefaultStrongHashGenerator(),
 		FileChecksumHash: DefaultFileHashGenerator(),
 	}
@@ -39,6 +44,9 @@ type RollingHash interface {
 
 	AddBytes(bs []byte)
 	RemoveBytes(bs []byte)
+
+	// pairs up bytes to do remove/add in the right order
+	AddAndRemoveBytes(add []byte, remove []byte)
 
 	SetBlock(block []byte)
 

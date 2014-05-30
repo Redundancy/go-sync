@@ -184,9 +184,11 @@ func (c *Comparer) startFindMatchingBlocks_int(
 			blockMemory.Write(block)
 			i += int64(n)
 		} else if n > 0 {
-			generator.WeakRollingHash.AddBytes(readBytes)
 			blockMemory.Write(readBytes)
-			generator.WeakRollingHash.RemoveBytes(blockMemory.Evicted())
+			generator.WeakRollingHash.AddAndRemoveBytes(
+				readBytes,
+				blockMemory.Evicted(),
+			)
 			i += int64(n)
 		}
 
@@ -199,6 +201,7 @@ func (c *Comparer) startFindMatchingBlocks_int(
 			if blockMemory.Empty() {
 				break
 			}
+
 			removedByte := blockMemory.Truncate(1)
 			generator.WeakRollingHash.RemoveBytes(removedByte)
 			i += 1
