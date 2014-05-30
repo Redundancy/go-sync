@@ -114,12 +114,24 @@ func (c *C2) GetBlock() []byte {
 
 // get the data that was evicted by the last write
 func (c *C2) Evicted() []byte {
+	if c.totalWritten <= c.blocksize {
+		return nil
+	}
+
 	bufferToRead := c.a
 	if c.b.head < c.a.head {
 		bufferToRead = c.b
 	}
 
-	return bufferToRead.buffer[bufferToRead.head+c.blocksize-c.lastWritten : bufferToRead.head+c.blocksize]
+	bufferStart := bufferToRead.head + c.blocksize
+	readLength := c.lastWritten
+
+	// if the buffer wasn't full, we don't read the full length
+	if c.totalWritten-c.lastWritten < c.blocksize {
+		readLength -= c.lastWritten - c.totalWritten + c.blocksize
+	}
+
+	return bufferToRead.buffer[bufferStart-readLength : bufferStart]
 }
 
 func (buff *doubleSizeBuffer) Reset() {

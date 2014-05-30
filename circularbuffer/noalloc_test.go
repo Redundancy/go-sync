@@ -26,6 +26,40 @@ func TestWriteBlock(t *testing.T) {
 	b.Write(incrementBlock)
 }
 
+func TestWritingUnderCapacityGivesEmptyEvicted(t *testing.T) {
+	b := MakeC2Buffer(2)
+	b.Write([]byte{1, 2})
+
+	if len(b.Evicted()) != 0 {
+		t.Fatal("Evicted should have been empty:", b.Evicted())
+	}
+}
+
+func TestWritingMultipleBytesWhenBufferIsNotFull(t *testing.T) {
+	b := MakeC2Buffer(3)
+	b.Write([]byte{1, 2})
+	b.Write([]byte{3, 4})
+
+	ev := b.Evicted()
+
+	if len(ev) != 1 || ev[0] != 1 {
+		t.Fatal("Evicted should have been [1,]:", ev)
+	}
+}
+
+func TestEvictedRegession1(t *testing.T) {
+	b := MakeC2Buffer(4)
+
+	b.Write([]byte{7, 6})
+	b.Write([]byte{5, 1, 2})
+	b.Write([]byte{3, 4})
+
+	ev := b.Evicted()
+	if len(ev) != 2 || ev[0] != 6 || ev[1] != 5 {
+		t.Fatalf("Unexpected evicted [6,5]: %v", ev)
+	}
+}
+
 func TestGetBlock(t *testing.T) {
 	b := MakeC2Buffer(BLOCK_SIZE)
 	b.Write(incrementBlock)
