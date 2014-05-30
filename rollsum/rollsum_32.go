@@ -29,9 +29,10 @@ func (r *Rollsum32) Write(p []byte) (n int, err error) {
 		r.buffer.Write(remaining)
 		r.Rollsum32Base.SetBlock(remaining)
 	} else {
+		b_len := r.buffer.Len()
 		r.buffer.Write(p)
 		evicted := r.buffer.Evicted()
-		r.Rollsum32Base.AddAndRemoveBytes(p, evicted)
+		r.Rollsum32Base.AddAndRemoveBytes(p, evicted, b_len)
 	}
 
 	return len(p), nil

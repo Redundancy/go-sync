@@ -28,7 +28,6 @@ func Build(c *cli.Context) {
 	filename := c.Args()[0]
 	blocksize := uint32(c.Int("blocksize"))
 	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
-
 	inputFile, err := os.Open(filename)
 
 	if err != nil {

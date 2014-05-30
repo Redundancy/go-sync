@@ -105,9 +105,9 @@ func TestThatRollsum32RemovesBytesCorrectly(t *testing.T) {
 
 	r1.AddByte(255)
 	r1.AddByte(10)
-	r1.RemoveByte(255)
+	r1.RemoveByte(255, 2)
 	r1.AddByte(0)
-	r1.RemoveByte(10)
+	r1.RemoveByte(10, 2)
 	r1.AddByte(0)
 
 	if r1.a != 0 || r1.b != 0 {
@@ -266,9 +266,8 @@ func BenchmarkIncrementalRollsum32WithC2(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		r.AddBytes(increment)
 		cbuffer.Write(increment)
-		r.RemoveBytes(cbuffer.Evicted())
+		r.AddAndRemoveBytes(increment, cbuffer.Evicted(), BLOCK_SIZE)
 		r.GetSum(checksum)
 	}
 	b.StopTimer()

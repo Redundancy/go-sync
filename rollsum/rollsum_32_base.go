@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 )
 
+const FULL_BYTES_16 = (1 << 16) - 1
+
 // Rollsum32Base decouples the rollsum algorithm from the implementation of
 // hash.Hash and the storage the rolling checksum window
 // this allows us to write different versions of the storage for the distinctly different
@@ -33,27 +35,30 @@ func (r *Rollsum32Base) AddBytes(bs []byte) {
 }
 
 // Remove a byte from the end of the rollsum
-func (r *Rollsum32Base) RemoveByte(b byte) {
+// Use the previous length (before removal)
+func (r *Rollsum32Base) RemoveByte(b byte, length int) {
 	r.a -= uint32(b)
-	r.b -= uint32(r.blockSize * uint(b))
+	r.b -= uint32(uint(length) * uint(b))
 }
 
-func (r *Rollsum32Base) RemoveBytes(bs []byte) {
+func (r *Rollsum32Base) RemoveBytes(bs []byte, length int) {
 	for _, b := range bs {
 		r.a -= uint32(b)
-		r.b -= uint32(r.blockSize * uint(b))
+		r.b -= uint32(uint(length) * uint(b))
+		length -= 1
 	}
 }
 
-func (r *Rollsum32Base) AddAndRemoveBytes(add []byte, remove []byte) {
+func (r *Rollsum32Base) AddAndRemoveBytes(add []byte, remove []byte, length int) {
 	len_added := len(add)
 	len_removed := len(remove)
 
 	startEvicted := len_added - len_removed
 	r.AddBytes(add[:startEvicted])
+	length += startEvicted
 
 	for i := startEvicted; i < len_added; i++ {
-		r.RemoveByte(remove[i-startEvicted])
+		r.RemoveByte(remove[i-startEvicted], length)
 		r.AddByte(add[i])
 	}
 }

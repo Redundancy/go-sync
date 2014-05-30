@@ -103,7 +103,7 @@ func Patch(c *cli.Context) {
 	sectionSize := local_file_size / num_matchers
 	sectionSize += int64(blocksize) - (sectionSize % int64(blocksize))
 	merger := &comparer.MatchMerger{}
-
+	compare := &comparer.Comparer{}
 	fmt.Printf("Using %v cores\n", num_matchers)
 
 	for i := int64(0); i < num_matchers; i++ {
@@ -121,7 +121,7 @@ func Patch(c *cli.Context) {
 
 		sectionGenerator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
 
-		matchStream := comparer.StartFindMatchingBlocks(
+		matchStream := compare.StartFindMatchingBlocks(
 			sectionReader, offset, sectionGenerator, index)
 
 		merger.StartMergeResultStream(matchStream, int64(blocksize))
@@ -134,20 +134,28 @@ func Patch(c *cli.Context) {
 	matchedBlockCountAfterMerging := uint(0)
 
 	for _, b := range mergedBlocks {
-		fmt.Printf("%#v\n", b)
+		//fmt.Printf("%#v\n", b)
 		totalMatchingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
 		matchedBlockCountAfterMerging += b.EndBlock - b.StartBlock + 1
 	}
 
+	fmt.Println("Comparisons:", compare.Comparisons)
+	fmt.Println("Weak hash hits:", compare.WeakHashHits)
+	fmt.Println("Weak hit rate:", 100.0*float64(compare.WeakHashHits)/float64(compare.Comparisons))
+
+	fmt.Println("Strong hash hits:", compare.StrongHashHits)
+	fmt.Println("Weak hash error rate:", 100.0*float64(compare.WeakHashHits-compare.StrongHashHits)/float64(compare.WeakHashHits))
 	fmt.Println("Total matched bytes:", totalMatchingSize)
 	fmt.Println("Total matched blocks:", matchedBlockCountAfterMerging)
 
 	// TODO: GetMissingBlocks uses the highest index, not the count, this can be pretty confusing
 	// Should clean up this interface to avoid that
 	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
+	fmt.Println("Index blocks:", index.BlockCount)
 
 	totalMissingSize := uint64(0)
 	for _, b := range missing {
+		//fmt.Printf("%#v\n", b)
 		totalMissingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
 	}
 

@@ -83,6 +83,10 @@ func (c *C2) maxWritten() int {
 	return c.blocksize
 }
 
+func (c *C2) Len() int {
+	return c.maxWritten()
+}
+
 func (c *C2) Empty() bool {
 	return c.totalWritten == 0
 }

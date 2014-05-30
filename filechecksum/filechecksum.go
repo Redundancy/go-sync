@@ -40,13 +40,13 @@ type RollingHash interface {
 	Size() int
 
 	AddByte(b byte)
-	RemoveByte(b byte)
+	RemoveByte(b byte, length int)
 
 	AddBytes(bs []byte)
-	RemoveBytes(bs []byte)
+	RemoveBytes(bs []byte, length int)
 
 	// pairs up bytes to do remove/add in the right order
-	AddAndRemoveBytes(add []byte, remove []byte)
+	AddAndRemoveBytes(add []byte, remove []byte, length int)
 
 	SetBlock(block []byte)
 
