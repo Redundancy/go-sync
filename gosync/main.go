@@ -23,62 +23,24 @@ var app *cli.App = cli.NewApp()
 func main() {
 	app.Name = "gosync"
 	app.Usage = "Build indexes, patches, patch files"
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{"profile", "enable HTTP profiling"},
+		cli.IntFlag{"profilePort", 6060, "The number of streams to use concurrently"},
+	}
 
-	/*
-		// TODO: how to enable profiling?
-		// os.Exit will cause the profile to fail to be written
-
-		app.Flags = []cli.Flag{
-			cli.BoolFlag{"prof", false, "Output a CPU profile as gosync.pprof"},
-		}
-
-		app.Before = func(c *cli.Context) {
-			if c.Bool("prof") {
-
-			}
-		}
-	*/
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+
+	app.Before = func(c *cli.Context) error {
+		if c.Bool("profile") {
+			port := fmt.Sprint(c.Int("profilePort"))
+
+			go func() {
+				log.Println(http.ListenAndServe("localhost:"+port, nil))
+			}()
+		}
+
+		return nil
+	}
+
 	app.Run(os.Args)
-}
-
-func openFileAndHandleError(filename string) (f *os.File) {
-	var err error
-	f, err = os.Open(filename)
-
-	if err != nil {
-		f = nil
-		handleFileError(filename, err)
-	}
-
-	return
-}
-
-func handleFileError(filename string, err error) {
-	switch {
-	case os.IsNotExist(err):
-		fmt.Fprintf(
-			os.Stderr,
-			"Could not find %v: %v\n",
-			filename,
-			err,
-		)
-	case os.IsPermission(err):
-		fmt.Fprintf(
-			os.Stderr,
-			"Could not open %v (permission denied): %v\n",
-			filename,
-			err,
-		)
-	default:
-		fmt.Fprintf(
-			os.Stderr,
-			"Unknown error opening %v: %v\n",
-			filename,
-			err,
-		)
-	}
 }

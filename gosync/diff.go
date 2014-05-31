@@ -19,16 +19,11 @@ func init() {
 	app.Commands = append(
 		app.Commands,
 		cli.Command{
-			Name:      "patch",
-			ShortName: "p",
-			Usage:     "gosync patch <localfile> <reference index> <reference source> [<output>]",
-			Description: `Recreate the reference source file, using an index and a local file that is believed to be similar.
-The index should be produced by "gosync build". 
-
-<reference index> is a .gosync file and may be a local, unc network path or http/https url
-<reference source> is corresponding target and may be a local, unc network path or http/https url
-<output> is optional. If not specified, the local file will be overwritten when done.`,
-			Action: Patch,
+			Name:        "diff",
+			ShortName:   "d",
+			Usage:       "gosync diff <localfile> <reference.gosync>",
+			Description: `Compare a file with a reference index, and print statistics on the comparison and performance.`,
+			Action:      Diff,
 			Flags: []cli.Flag{
 				cli.IntFlag{"p", runtime.NumCPU(), "The number of streams to use concurrently"},
 			},
@@ -36,7 +31,7 @@ The index should be produced by "gosync build".
 	)
 }
 
-func Patch(c *cli.Context) {
+func Diff(c *cli.Context) {
 	local_filename := c.Args()[0]
 	reference_filename := c.Args()[1]
 	start_time := time.Now()
