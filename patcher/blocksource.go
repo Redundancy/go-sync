@@ -26,7 +26,7 @@ Since these interfaces require specific structs to satisfy, it's expected that i
 
 */
 type BlockSource interface {
-	RequestBlock(MissingBlockSpan)
+	RequestBlock(MissingBlockSpan) error
 
 	GetResultChannel() <-chan BlockReponse
 

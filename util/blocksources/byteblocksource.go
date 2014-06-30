@@ -17,6 +17,10 @@ func NewByteBlockSource(data []byte) *ByteBlockSource {
 	return s
 }
 
+/*
+ByteBlockSource is provided largely for convenience in testing and
+as a very simple example.
+*/
 type ByteBlockSource struct {
 	data           []byte
 	errorChan      chan error
@@ -29,8 +33,9 @@ func (s *ByteBlockSource) ReadBytes() int64 {
 	return s.requestedBytes
 }
 
-func (s *ByteBlockSource) RequestBlock(block patcher.MissingBlockSpan) {
+func (s *ByteBlockSource) RequestBlock(block patcher.MissingBlockSpan) error {
 	s.requestChan <- block
+	return nil
 }
 
 func (s *ByteBlockSource) GetResultChannel() <-chan patcher.BlockReponse {

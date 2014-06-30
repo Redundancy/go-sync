@@ -1,10 +1,48 @@
 package blocksources
 
 import (
+	"bytes"
+	"fmt"
+	"github.com/Redundancy/go-sync/patcher"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
+	"time"
 )
+
+var PORT = 8000
+
+var TEST_CONTENT = []byte("This is test content used for evaluation of the unit tests")
+var content = bytes.NewReader(TEST_CONTENT)
+var LOCAL_URL = ""
+
+// Respond to any request with the above content
+func handler(w http.ResponseWriter, req *http.Request) {
+	http.ServeContent(w, req, "", time.Now(), content)
+}
+
+// set up a http server locally that will respond predictably to ranged requests
+func init() {
+
+	go func() {
+		for {
+			p := fmt.Sprintf(":%v", PORT)
+			LOCAL_URL = "http://localhost" + p
+
+			err := http.ListenAndServe(
+				p,
+				http.HandlerFunc(handler),
+			)
+
+			if err != nil {
+				// TODO: if at start, try another port
+				PORT += 1
+			}
+		}
+	}()
+
+}
 
 // ensure that a ranged request is implemented correctly
 func TestRangedRequest(t *testing.T) {
@@ -97,5 +135,46 @@ func TestNoResponseError(t *testing.T) {
 		100,
 	)
 
-	t.Fatalf("%#v", err)
+	switch err.(type) {
+	case *url.Error:
+	default:
+		t.Fatalf("%#v", err)
+	}
+}
+
+func TestHandler(t *testing.T) {
+	resp, err := http.Get(LOCAL_URL)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.StatusCode != 200 {
+		t.Fatal(resp.Status)
+	}
+}
+
+func TestHttpBlockSource(t *testing.T) {
+	b := NewHttpBlockSource(LOCAL_URL, 2)
+
+	err := b.RequestBlock(patcher.MissingBlockSpan{
+		BlockSize:  4,
+		StartBlock: 0,
+		EndBlock:   0,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := b.GetResultChannel()
+
+	select {
+	case r := <-results:
+		if bytes.Compare(r.Data, TEST_CONTENT[:4]) != 0 {
+			t.Errorf("Data differed from expected content: \"%v\"", string(r.Data))
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Waited a second for the response, timeout.")
+	}
 }

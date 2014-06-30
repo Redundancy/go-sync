@@ -28,13 +28,27 @@ When there are very similar files, the speed is far higher.
 Budget for 8 MB/s byte by byte comparison on single thread: 120ns
 
 Current Benchmark State:
-1. Checksum: 62.7 ns
-1. Comparison (No index lookup)
- 1. Weak Rejection: 85.2 ns
- 1. Strong Rejection: 458 ns (MD5: 391 ns)
-1. Index Lookup: 70 ns + (for reject)
+- Checksum: 62.7 ns
+- Comparison (No index lookup)
+  - Weak Rejection: 85.2 ns
+  - Strong Rejection: 458 ns (MD5: 391 ns)
+- Index Lookup: 70 ns + (for reject)
 
-The 32 bit Rollsum hash produces far fewer false positives than the 16 bit one, with the same 4 byte hash overhead. 
+The 32 bit Rollsum hash produces far fewer false positives than the 16 bit one, with the same 4 byte hash overhead.
+
+Index generation:
+- Easily hits 100 MB/s on my workstation, satisfying the idea that you should be able to build 12 GB payloads in ~1m 
+- More likely to be bottlenecked by the disk throughput / seek time than the CPU
+
+### TODO
+- [ ] Provide more helpers to make common usage easier (multi-threading etc)
+- [ ] Clean up naming consistency and clarity: Block / Chunk etc
+- [ ] Flesh out full directory build / sync
+- [ ] Implement 'patch' payloads from a known start point to a desired endstate
+- [ ] Validate full file checksum after patching
+- [ ] Provide bandwidth limiting / monitoring as part of http blocksource
+- [ ] Think about turning the filechecksum into an interface
+- [ ] Avoid marshalling / unmarshalling blocks during checksum generation
 
 ### Testing
 
@@ -45,5 +59,5 @@ The 32 bit Rollsum hash produces far fewer false positives than the 16 bit one, 
 #### Commandline & files
 
 	go build github.com/Redundancy/go-sync/gosync
-	gosync b filenameToPatchTo
-	gosync p filenameToPatchFrom filenameToPatchTo.gosync
+	gosync build filenameToPatchTo
+	gosync patch filenameToPatchFrom filenameToPatchTo.gosync

@@ -1,15 +1,15 @@
 package blocksources
 
 import (
-	"code.google.com/p/mxk/go1/flowcontrol"
 	"errors"
 	"fmt"
 	"github.com/Redundancy/go-sync/patcher"
-	"net"
+	"io/ioutil"
 	"net/http"
-	"net/url"
+	"time"
 )
 
+/*
 func NewLimitedNetConnection(bytesPerSecond int64) *LimitedNetConnection {
 	c := &LimitedNetConnection{}
 	c.Reader = flowcontrol.NewReader(c.Conn, bytesPerSecond)
@@ -21,11 +21,12 @@ type LimitedNetConnection struct {
 	net.Conn
 	*flowcontrol.Reader
 }
+*/
 
 func NewHttpBlockSource(
 	url string,
 	concurrentRequests int,
-	bytesPerSecondLimit int64,
+	//bytesPerSecondLimit int64,
 ) *HttpBlockSource {
 
 	s := &HttpBlockSource{
@@ -36,12 +37,14 @@ func NewHttpBlockSource(
 		requestChan:        make(chan patcher.MissingBlockSpan),
 	}
 
-	if bytesPerSecondLimit > 0 {
+	// Rate limiting not implmented yet
+	/*if bytesPerSecondLimit > 0 {
 		s.client = &http.Client{}
 		//s.client.Transport = NewLimitedNetConnection(bytesPerSecondLimit)
 	} else {
-		s.client = http.DefaultClient
-	}
+	*/
+	s.client = http.DefaultClient
+	//}
 
 	go s.loop()
 
@@ -68,8 +71,19 @@ func (s *HttpBlockSource) ReadBytes() int64 {
 	return s.requestedBytes
 }
 
-func (s *HttpBlockSource) RequestBlock(block patcher.MissingBlockSpan) {
-	s.requestChan <- block
+var TimeoutError = errors.New("Request timed out")
+
+func (s *HttpBlockSource) RequestBlock(block patcher.MissingBlockSpan) error {
+	// Reqest channel may be blocked
+	// TODO: this does not deal with the case where s.requestChan has been closed
+	// which would panic
+	select {
+	case s.requestChan <- block:
+		return nil
+	case <-time.After(time.Second):
+		return TimeoutError
+	}
+
 }
 
 func (s *HttpBlockSource) GetResultChannel() <-chan patcher.BlockReponse {
@@ -88,10 +102,10 @@ func (s *HttpBlockSource) loop() {
 	inflightRequests := 0
 
 	// Set to nil when there is nothing to send
-	//var responseChan chan patcher.BlockReponse = nil
+	var responseChan chan patcher.BlockReponse = nil
 	var errorChan chan error = nil
 	var currentError error = nil
-	//var firstResponse patcher.BlockReponse
+	var firstResponse patcher.BlockReponse
 	requestChan := s.requestChan
 	s.httpResponseChan = make(chan httpResponse, s.concurrentRequests)
 
@@ -103,7 +117,7 @@ func (s *HttpBlockSource) loop() {
 		case request := <-requestChan:
 			startOffset := int64(request.StartBlock) * request.BlockSize
 			// for the last block, may be past the end
-			endOffset := int64(request.EndBlock+1) * request.BlockSize
+			endOffset := int64(request.EndBlock+1)*request.BlockSize - 1
 
 			// fire off an http request
 			s.startRequest(
@@ -115,19 +129,44 @@ func (s *HttpBlockSource) loop() {
 				requestChan = nil
 			}
 
+		case responseChan <- firstResponse:
+			responseChan = nil
 		case response := <-s.httpResponseChan:
+			var data []byte
+			var err error
+
 			if response.err != nil {
 				// for the moment, we assume that no error is recoverable
 				// TODO: figure out strategies for various possible recoverable
 				// errors
+				fatalError = true
 				errorChan = s.errorChan
 				currentError = response.err
+
+				// Prevent any more requests from being filled
+				requestChan = nil
+			} else if data, err = ioutil.ReadAll(response.reponse.Body); err != nil {
+				fatalError = true
+				errorChan = s.errorChan
+				currentError = err
 
 				// Prevent any more requests from being filled
 				requestChan = nil
 			}
 
 			inflightRequests -= 1
+
+			if !fatalError && requestChan == nil {
+				// clearly we were full, but now have a free request slot
+				requestChan = s.requestChan
+			}
+
+			firstResponse = patcher.BlockReponse{
+				Data: data,
+			}
+			if responseChan == nil {
+				responseChan = s.responseChan
+			}
 
 		case errorChan <- currentError:
 			errorChan = nil
@@ -168,7 +207,7 @@ func rangedRequest(client *http.Client, url string, startOffset int64, endOffset
 		return nil, err
 	}
 
-	if rangedResponse.StatusCode != 404 {
+	if rangedResponse.StatusCode == 404 {
 		return nil, UrlNotFoundError
 	} else if rangedResponse.StatusCode != 206 {
 		rangedResponse.Body.Close()
