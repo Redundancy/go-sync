@@ -24,6 +24,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 // set up a http server locally that will respond predictably to ranged requests
 func init() {
+	s := http.NewServeMux()
+	s.HandleFunc("/", handler)
+	s.Handle("/404", http.NotFoundHandler())
 
 	go func() {
 		for {
@@ -32,7 +35,7 @@ func init() {
 
 			err := http.ListenAndServe(
 				p,
-				http.HandlerFunc(handler),
+				s,
 			)
 
 			if err != nil {
@@ -155,7 +158,7 @@ func TestHandler(t *testing.T) {
 }
 
 func TestHttpBlockSource(t *testing.T) {
-	b := NewHttpBlockSource(LOCAL_URL, 2)
+	b := NewHttpBlockSource(LOCAL_URL+"/", 2)
 
 	err := b.RequestBlock(patcher.MissingBlockSpan{
 		BlockSize:  4,
@@ -174,7 +177,97 @@ func TestHttpBlockSource(t *testing.T) {
 		if bytes.Compare(r.Data, TEST_CONTENT[:4]) != 0 {
 			t.Errorf("Data differed from expected content: \"%v\"", string(r.Data))
 		}
+	case e := <-b.EncounteredError():
+		t.Fatal(e)
 	case <-time.After(time.Second):
 		t.Fatal("Waited a second for the response, timeout.")
 	}
+}
+
+func TestHttpBlockSource404(t *testing.T) {
+	b := NewHttpBlockSource(LOCAL_URL+"/404", 2)
+
+	b.RequestBlock(patcher.MissingBlockSpan{
+		BlockSize:  4,
+		StartBlock: 0,
+		EndBlock:   0,
+	})
+
+	results := b.GetResultChannel()
+
+	select {
+	case <-results:
+		t.Fatal("Should not have gotten a result")
+	case e := <-b.EncounteredError():
+		if e == nil {
+			t.Fatal("Error was nil!")
+		} else if e != UrlNotFoundError {
+			t.Errorf("Unexpected error type: %v", e)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Waited a second for the response, timeout.")
+	}
+}
+
+func TestHttpBlockSourceOffsetBlockRequest(t *testing.T) {
+	b := NewHttpBlockSource(LOCAL_URL+"/", 2)
+
+	b.RequestBlock(patcher.MissingBlockSpan{
+		BlockSize:  4,
+		StartBlock: 1,
+		EndBlock:   3,
+	})
+
+	select {
+	case result := <-b.GetResultChannel():
+		if result.StartBlock != 1 {
+			t.Errorf(
+				"Unexpected result start block: %v",
+				result.StartBlock,
+			)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("Timeout waiting for result")
+	}
+}
+
+func TestMultipleRequestOrdering(t *testing.T) {
+	b := NewHttpBlockSource(LOCAL_URL+"/", 2)
+
+	b.RequestBlock(patcher.MissingBlockSpan{
+		BlockSize:  4,
+		StartBlock: 1,
+		EndBlock:   3,
+	})
+
+	b.RequestBlock(patcher.MissingBlockSpan{
+		BlockSize:  4,
+		StartBlock: 0,
+		EndBlock:   0,
+	})
+
+	time.Sleep(time.Millisecond * 600)
+
+	results := b.GetResultChannel()
+
+	EXPECTED_START_BLOCKS := []uint{
+		0,
+		1,
+	}
+
+	for i := 0; i < 2; i++ {
+		select {
+		case result := <-results:
+			if result.StartBlock != EXPECTED_START_BLOCKS[i] {
+				t.Errorf(
+					"Unexpected result start block (%v): %v",
+					i,
+					result.StartBlock,
+				)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("Timeout waiting for result %v", i+1)
+		}
+	}
+
 }

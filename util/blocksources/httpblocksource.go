@@ -6,6 +6,7 @@ import (
 	"github.com/Redundancy/go-sync/patcher"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"time"
 )
 
@@ -64,6 +65,7 @@ type HttpBlockSource struct {
 
 type httpResponse struct {
 	err     error
+	blockID uint
 	reponse *http.Response
 }
 
@@ -95,17 +97,32 @@ func (s *HttpBlockSource) EncounteredError() <-chan error {
 	return s.errorChan
 }
 
+type PendingResponses []patcher.BlockReponse
+
+func (r PendingResponses) Len() int {
+	return len(r)
+}
+
+func (r PendingResponses) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r PendingResponses) Less(i, j int) bool {
+	return r[i].StartBlock < r[j].StartBlock
+}
+
 func (s *HttpBlockSource) loop() {
 	defer close(s.errorChan)
 	defer close(s.responseChan)
-	//pendingResponses := make([]patcher.BlockReponse, 0, 10)
 	inflightRequests := 0
 
 	// Set to nil when there is nothing to send
 	var responseChan chan patcher.BlockReponse = nil
 	var errorChan chan error = nil
 	var currentError error = nil
-	var firstResponse patcher.BlockReponse
+	var responses = make(PendingResponses, 0, s.concurrentRequests)
+	var nextReponse patcher.BlockReponse
+
 	requestChan := s.requestChan
 	s.httpResponseChan = make(chan httpResponse, s.concurrentRequests)
 
@@ -122,6 +139,7 @@ func (s *HttpBlockSource) loop() {
 			// fire off an http request
 			s.startRequest(
 				startOffset, endOffset,
+				request.StartBlock,
 			)
 
 			inflightRequests += 1
@@ -129,8 +147,15 @@ func (s *HttpBlockSource) loop() {
 				requestChan = nil
 			}
 
-		case responseChan <- firstResponse:
-			responseChan = nil
+		case responseChan <- nextReponse:
+			responses = responses[:len(responses)-1]
+
+			if len(responses) == 0 {
+				responseChan = nil
+			} else {
+				nextReponse = responses[len(responses)-1]
+			}
+
 		case response := <-s.httpResponseChan:
 			var data []byte
 			var err error
@@ -145,14 +170,20 @@ func (s *HttpBlockSource) loop() {
 
 				// Prevent any more requests from being filled
 				requestChan = nil
+				continue
+
 			} else if data, err = ioutil.ReadAll(response.reponse.Body); err != nil {
 				fatalError = true
 				errorChan = s.errorChan
 				currentError = err
 
+				response.reponse.Body.Close()
+
 				// Prevent any more requests from being filled
 				requestChan = nil
+				continue
 			}
+			defer response.reponse.Body.Close()
 
 			inflightRequests -= 1
 
@@ -161,9 +192,17 @@ func (s *HttpBlockSource) loop() {
 				requestChan = s.requestChan
 			}
 
-			firstResponse = patcher.BlockReponse{
-				Data: data,
-			}
+			responses = append(
+				responses,
+				patcher.BlockReponse{
+					Data:       data,
+					StartBlock: response.blockID,
+				},
+			)
+
+			sort.Sort(sort.Reverse(responses))
+			nextReponse = responses[len(responses)-1]
+
 			if responseChan == nil {
 				responseChan = s.responseChan
 			}
@@ -175,7 +214,10 @@ func (s *HttpBlockSource) loop() {
 	}
 }
 
-func (s *HttpBlockSource) startRequest(startOffset, endOffset int64) {
+func (s *HttpBlockSource) startRequest(
+	startOffset, endOffset int64,
+	blockID uint,
+) {
 	go func() {
 		req, err := rangedRequest(
 			s.client,
@@ -184,14 +226,19 @@ func (s *HttpBlockSource) startRequest(startOffset, endOffset int64) {
 			endOffset,
 		)
 
-		s.httpResponseChan <- httpResponse{err, req}
+		s.httpResponseChan <- httpResponse{err, blockID, req}
 	}()
 }
 
 var RangedRequestNotSupportedError = errors.New("Ranged request not supported (Server did not respond with 206 Status)")
 var UrlNotFoundError = errors.New("404 Error on URL")
 
-func rangedRequest(client *http.Client, url string, startOffset int64, endOffset int64) (*http.Response, error) {
+func rangedRequest(
+	client *http.Client,
+	url string,
+	startOffset int64,
+	endOffset int64,
+) (*http.Response, error) {
 	rangedRequest, err := http.NewRequest("GET", url, nil)
 
 	if err != nil {
