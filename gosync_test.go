@@ -9,6 +9,8 @@ import (
 	"github.com/Redundancy/go-sync/patcher"
 	"github.com/Redundancy/go-sync/patcher/sequential"
 	"github.com/Redundancy/go-sync/util/blocksources"
+	"github.com/Redundancy/go-sync/util/readers"
+	"testing"
 )
 
 func ToPatcherFoundSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.FoundBlockSpan {
@@ -86,10 +88,12 @@ func Example() {
 		return
 	}
 
+	compare := &comparer.Comparer{}
+
 	// This will result in a stream of blocks that match in the local version
 	// to those in the reference
 	// We could do this on two goroutines simultaneously, if we used two identical generators
-	matchStream := comparer.StartFindMatchingBlocks(
+	matchStream := compare.StartFindMatchingBlocks(
 		bytes.NewBufferString(LOCAL_VERSION),
 		0,
 		generator,
@@ -110,7 +114,9 @@ func Example() {
 
 	// the "file" to write to
 	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
-	remoteReferenceSource := blocksources.NewByteBlockSource([]byte(REFERENCE))
+	remoteReferenceSource := blocksources.NewReadSeekerBlockSource(
+		bytes.NewReader([]byte(REFERENCE)),
+	)
 
 	err = sequential.SequentialPatcher(
 		bytes.NewReader([]byte(LOCAL_VERSION)),
@@ -138,4 +144,38 @@ func Example() {
 	// Patched result: "The quick brown fox jumped over the lazy dog"
 	// Remotely requested bytes: 16 (without the index!)
 	// Full file length: 44 bytes
+}
+
+const (
+	BYTE = 1
+	KB   = 1024 * BYTE
+	MB   = 1024 * KB
+)
+
+func BenchmarkIndexComparisons(b *testing.B) {
+	b.ReportAllocs()
+
+	const SIZE = 200 * KB
+	b.SetBytes(SIZE)
+
+	file := readers.NewSizedNonRepeatingSequence(6, SIZE)
+	generator := filechecksum.NewFileChecksumGenerator(8 * KB)
+	_, index, err := indexbuilder.BuildChecksumIndex(generator, file)
+
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		// must reinitialize the file for each comparison
+		other_file := readers.NewSizedNonRepeatingSequence(745656, SIZE)
+		compare := &comparer.Comparer{}
+		m := compare.StartFindMatchingBlocks(other_file, 0, generator, index)
+
+		for _, ok := <-m; ok; {
+		}
+	}
+
+	b.StopTimer()
 }
