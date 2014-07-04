@@ -8,11 +8,14 @@ import (
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	sync_index "github.com/Redundancy/go-sync/index"
+	"github.com/Redundancy/go-sync/patcher"
+	"github.com/Redundancy/go-sync/patcher/sequential"
+	"github.com/Redundancy/go-sync/util/blocksources"
 	"github.com/codegangsta/cli"
 	"io"
+	"io/ioutil"
 	"os"
 	"runtime"
-	"time"
 )
 
 func init() {
@@ -36,57 +39,104 @@ The index should be produced by "gosync build".
 	)
 }
 
+// Making up a number
+const MAX_PATCHING_BLOCK_STORAGE = 40
+
 func Patch(c *cli.Context) {
+	var err error = nil
+
+	// handle error cases and exit as the last thing we do
+	// don't use os.Exit elsewhere, let defer handlers clean up
+	defer func() {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}()
+
 	local_filename := c.Args()[0]
-	reference_filename := c.Args()[1]
-	start_time := time.Now()
+	gosync_arg := c.Args()[1]
+	reference_arg := c.Args()[2]
+	use_tempfile := len(c.Args()) == 4
 
-	local_file := openFileAndHandleError(local_filename)
+	local_file, err := os.Open(local_filename)
 
-	if local_file == nil {
-		os.Exit(1)
+	if err != nil {
+		err = formatFileError(local_filename, err)
+		return
 	}
 
-	defer local_file.Close()
+	defer func() {
+		if e := local_file.Close(); err == nil {
+			err = e
+		}
+	}()
+
+	var out_file *os.File = nil
+
+	if use_tempfile {
+		out_file, err = ioutil.TempFile(".", "tmp_")
+	} else {
+		out_file, err = os.Create(c.Args()[3])
+		out_filename := out_file.Name()
+
+		// Cleanup the temporary file after it is closed
+		defer func() {
+			if e := os.Remove(out_filename); err != nil {
+				err = e
+			}
+		}()
+	}
+
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if e := out_file.Close(); err == nil {
+			err = e
+		}
+	}()
 
 	var blocksize uint32
-	reference_file := openFileAndHandleError(reference_filename)
+	indexReader, err := getLocalOrRemoteFile(gosync_arg)
 
-	if reference_file == nil {
-		os.Exit(1)
+	if err != nil {
+		err = formatFileError(local_filename, err)
+		return
 	}
 
-	defer reference_file.Close()
+	defer func() {
+		if e := indexReader.Close(); err == nil {
+			err = e
+		}
+	}()
 
-	e := binary.Read(reference_file, binary.LittleEndian, &blocksize)
+	// hello
+	err = binary.Read(indexReader, binary.LittleEndian, &blocksize)
 
-	if e != nil {
-		fmt.Printf("Error loading index: %v", e)
-		os.Exit(1)
+	if err != nil {
+		return
 	}
 
-	fmt.Println("Blocksize: ", blocksize)
 	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
 
 	readChunks, err := chunks.LoadChecksumsFromReader(
-		reference_file,
+		indexReader,
 		generator.WeakRollingHash.Size(),
 		generator.StrongHash.Size(),
 	)
 
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 
 	index := sync_index.MakeChecksumIndex(readChunks)
-	fmt.Println("Weak hash count:", index.WeakCount())
 
 	fi, err := local_file.Stat()
 
 	if err != nil {
-		fmt.Println("Could not get info on file:", err)
-		os.Exit(1)
+		return
 	}
 
 	num_matchers := int64(c.Int("p"))
@@ -94,20 +144,22 @@ func Patch(c *cli.Context) {
 	local_file_size := fi.Size()
 
 	// Don't split up small files
-	if local_file_size < 1024*1024 {
+	if local_file_size < MB {
 		num_matchers = 1
 	}
 
+	// Note: Since not all sections of the file are equal in work
+	// it would be better to divide things up into more sections and
+	// pull work from a queue channel as each finish
 	sectionSize := local_file_size / num_matchers
 	sectionSize += int64(blocksize) - (sectionSize % int64(blocksize))
 	merger := &comparer.MatchMerger{}
 	compare := &comparer.Comparer{}
-	fmt.Printf("Using %v cores\n", num_matchers)
 
 	for i := int64(0); i < num_matchers; i++ {
 		offset := sectionSize * i
 
-		// Sections must overlap by blocksize
+		// Sections must overlap by blocksize (strictly blocksize - 1?)
 		if i > 0 {
 			offset -= int64(blocksize)
 		}
@@ -126,37 +178,19 @@ func Patch(c *cli.Context) {
 	}
 
 	mergedBlocks := merger.GetMergedBlocks()
-
-	fmt.Println("\nMatched:")
-	totalMatchingSize := uint64(0)
-	matchedBlockCountAfterMerging := uint(0)
-
-	for _, b := range mergedBlocks {
-		//fmt.Printf("%#v\n", b)
-		totalMatchingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
-		matchedBlockCountAfterMerging += b.EndBlock - b.StartBlock + 1
-	}
-
-	fmt.Println("Comparisons:", compare.Comparisons)
-	fmt.Println("Weak hash hits:", compare.WeakHashHits)
-	fmt.Println("Weak hit rate:", 100.0*float64(compare.WeakHashHits)/float64(compare.Comparisons))
-
-	fmt.Println("Strong hash hits:", compare.StrongHashHits)
-	fmt.Println("Weak hash error rate:", 100.0*float64(compare.WeakHashHits-compare.StrongHashHits)/float64(compare.WeakHashHits))
-	fmt.Println("Total matched bytes:", totalMatchingSize)
-	fmt.Println("Total matched blocks:", matchedBlockCountAfterMerging)
-
-	// TODO: GetMissingBlocks uses the highest index, not the count, this can be pretty confusing
-	// Should clean up this interface to avoid that
 	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
-	fmt.Println("Index blocks:", index.BlockCount)
 
-	totalMissingSize := uint64(0)
-	for _, b := range missing {
-		//fmt.Printf("%#v\n", b)
-		totalMissingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
-	}
+	var source patcher.BlockSource = nil
+	// TODO: is source is a local file, use the reader block source
+	source = blocksources.NewHttpBlockSource(reference_arg, 4)
 
-	fmt.Println("Total missing bytes:", totalMissingSize)
-	fmt.Println("Time taken:", time.Now().Sub(start_time))
+	sequential.SequentialPatcher(
+		local_file,
+		source,
+		toPatcherMissingSpan(missing, int64(blocksize)),
+		toPatcherFoundSpan(mergedBlocks, int64(blocksize)),
+		MAX_PATCHING_BLOCK_STORAGE,
+		out_file,
+	)
+
 }
