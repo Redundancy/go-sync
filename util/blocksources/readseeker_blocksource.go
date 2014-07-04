@@ -2,11 +2,21 @@ package blocksources
 
 import (
 	"github.com/Redundancy/go-sync/patcher"
+	"io"
 )
 
-func NewByteBlockSource(data []byte) *ByteBlockSource {
-	s := &ByteBlockSource{
-		data:         data,
+const (
+	from_start = 0
+)
+
+type ReadSeeker interface {
+	Read(b []byte) (n int, err error)
+	Seek(offset int64, whence int) (int64, error)
+}
+
+func NewReadSeekerBlockSource(r ReadSeeker) *ReadSeekerBlockSource {
+	s := &ReadSeekerBlockSource{
+		data:         r,
 		errorChan:    make(chan error),
 		responseChan: make(chan patcher.BlockReponse),
 		requestChan:  make(chan patcher.MissingBlockSpan),
@@ -21,33 +31,33 @@ func NewByteBlockSource(data []byte) *ByteBlockSource {
 ByteBlockSource is provided largely for convenience in testing and
 as a very simple example.
 */
-type ByteBlockSource struct {
-	data           []byte
+type ReadSeekerBlockSource struct {
+	data           ReadSeeker
 	errorChan      chan error
 	responseChan   chan patcher.BlockReponse
 	requestChan    chan patcher.MissingBlockSpan
 	requestedBytes int64
 }
 
-func (s *ByteBlockSource) ReadBytes() int64 {
+func (s *ReadSeekerBlockSource) ReadBytes() int64 {
 	return s.requestedBytes
 }
 
-func (s *ByteBlockSource) RequestBlock(block patcher.MissingBlockSpan) error {
+func (s *ReadSeekerBlockSource) RequestBlock(block patcher.MissingBlockSpan) error {
 	s.requestChan <- block
 	return nil
 }
 
-func (s *ByteBlockSource) GetResultChannel() <-chan patcher.BlockReponse {
+func (s *ReadSeekerBlockSource) GetResultChannel() <-chan patcher.BlockReponse {
 	return s.responseChan
 }
 
 // If the block source encounters an unsurmountable problem
-func (s *ByteBlockSource) EncounteredError() <-chan error {
+func (s *ReadSeekerBlockSource) EncounteredError() <-chan error {
 	return s.errorChan
 }
 
-func (s *ByteBlockSource) loop() {
+func (s *ReadSeekerBlockSource) loop() {
 	defer close(s.errorChan)
 	defer close(s.responseChan)
 	pendingResponses := make([]patcher.BlockReponse, 0, 10)
@@ -63,22 +73,35 @@ func (s *ByteBlockSource) loop() {
 		case request := <-s.requestChan:
 			startOffset := int64(request.StartBlock) * request.BlockSize
 			endOffset := int64(request.EndBlock+1) * request.BlockSize
+			read_length := endOffset - startOffset
 
-			if endOffset > int64(len(s.data)) {
-				endOffset = int64(len(s.data))
+			buffer := make([]byte, read_length)
+
+			if _, err := s.data.Seek(startOffset, from_start); err != nil {
+				currentError = err
+				errorChan = s.errorChan
+				continue
+			}
+
+			n, err := io.ReadFull(s.data, buffer)
+
+			if err != nil && err != io.ErrUnexpectedEOF {
+				currentError = err
+				errorChan = s.errorChan
+				continue
 			}
 
 			pendingResponses = append(
 				pendingResponses,
 				patcher.BlockReponse{
 					StartBlock: request.StartBlock,
-					Data:       s.data[startOffset:endOffset],
+					Data:       buffer[:n],
 				},
 			)
 
 			firstResponse = pendingResponses[0]
 			responseChan = s.responseChan
-			s.requestedBytes += endOffset - startOffset
+			s.requestedBytes += int64(n)
 
 		case responseChan <- firstResponse:
 			// take 1
@@ -90,7 +113,8 @@ func (s *ByteBlockSource) loop() {
 			}
 
 		case errorChan <- currentError:
-			// no errors!
+			currentError = nil
+			errorChan = nil
 		}
 	}
 }
