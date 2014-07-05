@@ -17,15 +17,22 @@ var TEST_CONTENT = []byte("This is test content used for evaluation of the unit 
 var content = bytes.NewReader(TEST_CONTENT)
 var LOCAL_URL = ""
 
-// Respond to any request with the above content
 func handler(w http.ResponseWriter, req *http.Request) {
 	http.ServeContent(w, req, "", time.Now(), content)
+}
+
+var PARTIAL_CONTENT = []byte("abcdef")
+var partialContent = bytes.NewReader(PARTIAL_CONTENT)
+
+func partialContentHandler(w http.ResponseWriter, req *http.Request) {
+	http.ServeContent(w, req, "", time.Now(), partialContent)
 }
 
 // set up a http server locally that will respond predictably to ranged requests
 func init() {
 	s := http.NewServeMux()
 	s.HandleFunc("/", handler)
+	s.HandleFunc("/partial", partialContentHandler)
 	s.Handle("/404", http.NotFoundHandler())
 
 	go func() {
@@ -270,4 +277,40 @@ func TestMultipleRequestOrdering(t *testing.T) {
 		}
 	}
 
+}
+
+func TestHttpBlockSourcePartialContentRequest(t *testing.T) {
+	b := NewHttpBlockSource(LOCAL_URL+"/partial", 2)
+
+	b.RequestBlock(patcher.MissingBlockSpan{
+		BlockSize:  4,
+		StartBlock: 1,
+		EndBlock:   1,
+	})
+
+	select {
+	case result := <-b.GetResultChannel():
+		if result.StartBlock != 1 {
+			t.Errorf(
+				"Unexpected result start block: %v",
+				result.StartBlock,
+			)
+		}
+		if len(result.Data) != 2 {
+			t.Errorf(
+				"Unexpected data length: \"%v\"",
+				string(result.Data),
+			)
+		}
+		if string(result.Data) != "ef" {
+			t.Errorf(
+				"Unexpected result \"%v\"",
+				string(result.Data),
+			)
+		}
+	case err := <-b.EncounteredError():
+		t.Fatal(err)
+	case <-time.After(time.Second):
+		t.Fatalf("Timeout waiting for result")
+	}
 }
