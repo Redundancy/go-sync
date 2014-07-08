@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"github.com/Redundancy/go-sync/patcher"
 	"github.com/Redundancy/go-sync/util/blocksources"
+	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -43,6 +44,10 @@ func init() {
 	BLOCK_COUNT = len(REFERENCE_BLOCKS)
 }
 
+func stringToReadSeeker(input string) io.ReadSeeker {
+	return bytes.NewReader([]byte(input))
+}
+
 func TestPatchingStart(t *testing.T) {
 	LOCAL := bytes.NewReader([]byte("48 brown fox jumped over the lazy dog"))
 	out := bytes.NewBuffer(nil)
@@ -68,7 +73,7 @@ func TestPatchingStart(t *testing.T) {
 
 	err := SequentialPatcher(
 		LOCAL,
-		blocksources.NewByteBlockSource([]byte(REFERENCE_STRING)),
+		blocksources.NewReadSeekerBlockSource(stringToReadSeeker(REFERENCE_STRING)),
 		missing,
 		matched,
 		1024,
@@ -115,7 +120,7 @@ func TestPatchingEnd(t *testing.T) {
 
 	err := SequentialPatcher(
 		LOCAL,
-		blocksources.NewByteBlockSource([]byte(REFERENCE_STRING)),
+		blocksources.NewReadSeekerBlockSource(stringToReadSeeker(REFERENCE_STRING)),
 		missing,
 		matched,
 		1024,
@@ -153,7 +158,7 @@ func TestPatchingEntirelyMissing(t *testing.T) {
 
 	err := SequentialPatcher(
 		LOCAL,
-		blocksources.NewByteBlockSource([]byte(REFERENCE_STRING)),
+		blocksources.NewReadSeekerBlockSource(stringToReadSeeker(REFERENCE_STRING)),
 		missing,
 		matched,
 		1024,
