@@ -8,7 +8,6 @@ import (
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	sync_index "github.com/Redundancy/go-sync/index"
-	"github.com/Redundancy/go-sync/patcher"
 	"github.com/Redundancy/go-sync/patcher/sequential"
 	"github.com/Redundancy/go-sync/util/blocksources"
 	"github.com/codegangsta/cli"
@@ -76,6 +75,24 @@ func Patch(c *cli.Context) {
 
 	if use_tempfile {
 		out_file, err = ioutil.TempFile(".", "tmp_")
+
+		defer func() {
+			if err == nil {
+				tempfilename := out_file.Name()
+				finalName := c.Args()[3]
+
+				if _, e := os.Stat(finalName); e != nil && !os.IsNotExist(e) {
+					err = e
+					return
+				} else if e == nil {
+					err = os.Remove(finalName)
+				}
+
+				if err == nil {
+					err = os.Rename(tempfilename, finalName)
+				}
+			}
+		}()
 	} else {
 		out_file, err = os.Create(c.Args()[3])
 		out_filename := out_file.Name()
@@ -180,11 +197,10 @@ func Patch(c *cli.Context) {
 	mergedBlocks := merger.GetMergedBlocks()
 	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
 
-	var source patcher.BlockSource = nil
 	// TODO: is source is a local file, use the reader block source
-	source = blocksources.NewHttpBlockSource(reference_arg, 4)
+	source := blocksources.NewHttpBlockSource(reference_arg, 4)
 
-	sequential.SequentialPatcher(
+	err = sequential.SequentialPatcher(
 		local_file,
 		source,
 		toPatcherMissingSpan(missing, int64(blocksize)),
@@ -192,5 +208,8 @@ func Patch(c *cli.Context) {
 		MAX_PATCHING_BLOCK_STORAGE,
 		out_file,
 	)
+
+	fmt.Printf("Downloaded %v bytes\n", source.ReadBytes())
+	fmt.Printf("Total file is %v bytes\n", int64(index.BlockCount)*int64(blocksize))
 
 }

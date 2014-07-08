@@ -1,6 +1,7 @@
 /*
 Sequential Patcher will stream the patched version of the file to output,
-since it works strictly in order, it cannot patch the local file directly,
+since it works strictly in order, it cannot patch the local file directly
+(since it might overwrite a block needed later),
 so there would have to be a final copy once the patching was done.
 */
 package sequential
@@ -23,6 +24,7 @@ func SequentialPatcher(
 	maxBlockStorage uint64, // the amount of memory we're allowed to use for temporary data storage
 	output io.Writer,
 ) error {
+
 	maxBlockMissing := uint(0)
 	if len(missingLocal) > 0 {
 		maxBlockMissing = missingLocal[len(missingLocal)-1].EndBlock
@@ -46,7 +48,8 @@ func SequentialPatcher(
 	missing := missingLocal
 	matched := matchedLocal
 
-	for currentBlock < maxBlock {
+	// TODO: find a way to test this, since it seemed to be the cause of an issue
+	for currentBlock <= maxBlock {
 		// where is the next block supposed to come from?
 		if len(matched) > 0 && matched[0].StartBlock <= currentBlock && matched[0].EndBlock >= currentBlock {
 			firstMatched := matched[0]
