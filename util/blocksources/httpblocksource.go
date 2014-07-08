@@ -148,6 +148,7 @@ func (s *HttpBlockSource) loop() {
 			}
 
 		case responseChan <- nextReponse:
+			s.requestedBytes += int64(len(nextReponse.Data))
 			responses = responses[:len(responses)-1]
 
 			if len(responses) == 0 {

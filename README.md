@@ -49,6 +49,7 @@ Index generation:
 - [ ] Provide bandwidth limiting / monitoring as part of http blocksource
 - [ ] Think about turning the filechecksum into an interface
 - [ ] Avoid marshalling / unmarshalling blocks during checksum generation
+- [ ] Sequential patcher to resume after error?
 
 ### Testing
 

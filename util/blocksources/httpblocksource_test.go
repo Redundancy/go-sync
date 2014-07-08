@@ -46,7 +46,6 @@ func init() {
 			)
 
 			if err != nil {
-				// TODO: if at start, try another port
 				PORT += 1
 			}
 		}
