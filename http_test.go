@@ -79,7 +79,7 @@ func Example_httpBlockSource() {
 	merger.StartMergeResultStream(matchStream, BLOCK_SIZE)
 
 	matchingBlockRanges := merger.GetMergedBlocks()
-	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount))
+	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount) - 1)
 
 	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
 	remoteReferenceSource := blocksources.NewHttpBlockSource(LOCAL_URL+"/content", 2)

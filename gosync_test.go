@@ -109,7 +109,7 @@ func Example() {
 	matchingBlockRanges := merger.GetMergedBlocks()
 	PrintLocalSpans("Match", matchingBlockRanges, LOCAL_VERSION, BLOCK_SIZE)
 
-	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount))
+	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount) - 1)
 	PrintReferenceSpans("Missing", missingBlockRanges, REFERENCE, BLOCK_SIZE)
 
 	// the "file" to write to
@@ -128,6 +128,7 @@ func Example() {
 	)
 
 	if err != nil {
+		fmt.Println("Error:", err)
 		return
 	}
 
