@@ -9,6 +9,35 @@ import (
 	"time"
 )
 
+//-----------------------------------------------------------------------------
+type erroringRequester struct{}
+type testError struct{}
+
+func (e *testError) Error() string {
+	return "test"
+}
+
+func (e *erroringRequester) DoRequest(startOffset int64, endOffset int64) (data []byte, err error) {
+	return nil, &testError{}
+}
+
+func (e *erroringRequester) IsFatal(err error) bool {
+	return true
+}
+
+//-----------------------------------------------------------------------------
+type FunctionRequester func(a, b int64) ([]byte, error)
+
+func (f FunctionRequester) DoRequest(startOffset int64, endOffset int64) (data []byte, err error) {
+	return f(startOffset, endOffset)
+}
+
+func (f FunctionRequester) IsFatal(err error) bool {
+	return true
+}
+
+//-----------------------------------------------------------------------------
+
 func init() {
 	//if runtime.GOMAXPROCS(0) == 1 {
 	//runtime.GOMAXPROCS(4)
@@ -51,21 +80,6 @@ func TestErrorWatcher(t *testing.T) {
 	}
 }
 
-type erroringRequester struct{}
-type testError struct{}
-
-func (e *testError) Error() string {
-	return "test"
-}
-
-func (e *erroringRequester) DoRequest(startOffset int64, endOffset int64) (data []byte, err error) {
-	return nil, &testError{}
-}
-
-func (e *erroringRequester) IsFatal(err error) bool {
-	return true
-}
-
 func TestBlockSourceBaseError(t *testing.T) {
 	b := NewBlockSourceBase(&erroringRequester{}, 1, 1024)
 	defer b.Close()
@@ -82,16 +96,6 @@ func TestBlockSourceBaseError(t *testing.T) {
 	case <-b.EncounteredError():
 	}
 
-}
-
-type FunctionRequester func(a, b int64) ([]byte, error)
-
-func (f FunctionRequester) DoRequest(startOffset int64, endOffset int64) (data []byte, err error) {
-	return f(startOffset, endOffset)
-}
-
-func (f FunctionRequester) IsFatal(err error) bool {
-	return true
 }
 
 func TestBlockSourceRequest(t *testing.T) {
@@ -208,10 +212,72 @@ func TestOutOfOrderRequestCompletion(t *testing.T) {
 		select {
 		case r := <-b.GetResultChannel():
 			if r.StartBlock != i {
-				t.Errorf("Wrong start block: %v", r.StartBlock)
+				t.Errorf(
+					"Wrong start block: %v on result %v",
+					r.StartBlock,
+					i+1,
+				)
 			}
 		case <-time.After(time.Second):
 			t.Fatal("Timed out on request", i+1)
 		}
+	}
+}
+
+func TestRequestCountLimiting(t *testing.T) {
+	counter := make(chan int)
+	waiter := make(chan bool)
+	const (
+		MAX_CONCURRENCY = 2
+		REQUESTS        = 4
+	)
+
+	b := NewBlockSourceBase(
+		FunctionRequester(func(start, end int64) (data []byte, err error) {
+			counter <- 1
+			<-waiter
+			counter <- -1
+			return []byte{0, 0}, nil
+		}),
+		MAX_CONCURRENCY,
+		1024,
+	)
+	defer b.Close()
+
+	count := 0
+	max := 0
+
+	go func() {
+		for {
+			change, ok := <-counter
+
+			if !ok {
+				break
+			}
+
+			count += change
+			if count > max {
+				max = count
+			}
+		}
+	}()
+
+	for i := 0; i < REQUESTS; i++ {
+		b.RequestBlock(patcher.MissingBlockSpan{
+			BlockSize:  1,
+			StartBlock: uint(i),
+			EndBlock:   uint(i),
+		})
+	}
+
+	for i := 0; i < REQUESTS; i++ {
+		waiter <- true
+	}
+
+	close(counter)
+	close(waiter)
+
+	if max != MAX_CONCURRENCY {
+		t.Errorf("Maximum requests in flight was greater than the requested concurrency: %v", max)
 	}
 }

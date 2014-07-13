@@ -90,12 +90,6 @@ func (s *BlockSourceBase) Close() {
 	}
 }
 
-type asyncResult struct {
-	blockID uint
-	data    []byte
-	err     error
-}
-
 func (s *BlockSourceBase) loop() {
 	defer func() {
 		s.hasQuit = true
@@ -113,29 +107,53 @@ func (s *BlockSourceBase) loop() {
 	resultChan := make(chan asyncResult)
 	defer close(resultChan)
 
+	requestQueue := make(queuedRequestList, 0, s.ConcurrentRequests*2)
+
 	// enable us to order responses for the active requests, lowest to highest
 	requestOrdering := make(UintSlice, 0, s.ConcurrentRequests)
 	responseOrdering := make(PendingResponses, 0, s.ConcurrentRequests)
 
 	for state == STATE_RUNNING || inflightRequests > 0 || pendingErrors.Err() != nil {
-		select {
-		case newRequest := <-s.requestChannel:
-			inflightRequests += 1
-			requestOrdering = append(requestOrdering, newRequest.StartBlock)
-			sort.Sort(sort.Reverse(requestOrdering))
 
+		// Start any pending work that we can
+		for inflightRequests < s.ConcurrentRequests && len(requestQueue) > 0 {
+			inflightRequests += 1
+
+			nextRequest := requestQueue[len(requestQueue)-1]
+
+			requestOrdering = append(requestOrdering, nextRequest.startBlockID)
+			sort.Sort(sort.Reverse(requestOrdering))
 			go func() {
 				result, err := s.Requester.DoRequest(
-					int64(newRequest.StartBlock)*newRequest.BlockSize,
-					int64(newRequest.EndBlock+1)*newRequest.BlockSize,
+					nextRequest.startOffset,
+					nextRequest.endOffset,
 				)
 
 				resultChan <- asyncResult{
-					blockID: newRequest.StartBlock,
+					blockID: nextRequest.startBlockID,
 					data:    result,
 					err:     err,
 				}
 			}()
+
+			// remove dispatched request
+			requestQueue = requestQueue[:len(requestQueue)-1]
+		}
+
+		select {
+		case newRequest := <-s.requestChannel:
+			// TODO: limit size of individual requests, so that we can
+			// ensure that we use multiple concurrent connections, even when there
+			// is only a single continuous missing block
+
+			requestQueue = append(requestQueue, queuedRequest{
+				startBlockID: newRequest.StartBlock,
+				startOffset:  int64(newRequest.StartBlock) * newRequest.BlockSize,
+				endOffset:    int64(newRequest.EndBlock+1) * newRequest.BlockSize,
+			})
+
+			sort.Sort(sort.Reverse(requestQueue))
+
 		case result := <-resultChan:
 			inflightRequests -= 1
 
@@ -159,17 +177,20 @@ func (s *BlockSourceBase) loop() {
 			// sort high to low
 			sort.Sort(sort.Reverse(responseOrdering))
 
-			lowestResponse := responseOrdering[len(responseOrdering)-1]
+			// if we just got the lowest requested block, we can set
+			// the response. Otherwise, wait.
 			lowestRequest := requestOrdering[len(requestOrdering)-1]
 
-			if lowestRequest == lowestResponse.StartBlock {
+			if lowestRequest == result.blockID {
+				lowestResponse := responseOrdering[len(responseOrdering)-1]
+				pendingResponse.clear()
 				pendingResponse.setResponse(&lowestResponse)
-				responseOrdering = responseOrdering[:len(responseOrdering)-1]
-				requestOrdering = requestOrdering[:len(requestOrdering)-1]
 			}
 
 		case pendingResponse.sendIfPending() <- pendingResponse.Response():
 			pendingResponse.clear()
+			responseOrdering = responseOrdering[:len(responseOrdering)-1]
+			requestOrdering = requestOrdering[:len(requestOrdering)-1]
 
 			// check if there's another response to enqueue
 			if len(responseOrdering) > 0 {
@@ -178,8 +199,7 @@ func (s *BlockSourceBase) loop() {
 
 				if lowestRequest == lowestResponse.StartBlock {
 					pendingResponse.setResponse(&lowestResponse)
-					responseOrdering = responseOrdering[:len(responseOrdering)-1]
-					requestOrdering = requestOrdering[:len(requestOrdering)-1]
+
 				}
 			}
 
@@ -190,82 +210,4 @@ func (s *BlockSourceBase) loop() {
 			state = STATE_EXITING
 		}
 	}
-}
-
-// errorWatcher is a small helper object
-// sendIfSet will only return a channel if there is an error set
-// so w.sendIfSet() <- w.Err() is always safe in a select statement
-// even if there is no error set
-type errorWatcher struct {
-	errorChannel chan error
-	lastError    error
-}
-
-func (w *errorWatcher) setError(e error) {
-	if w.lastError != nil {
-		panic("cannot set a new error when one is already set!")
-	}
-	w.lastError = e
-}
-
-func (w *errorWatcher) clear() {
-	w.lastError = nil
-}
-
-func (w *errorWatcher) Err() error {
-	return w.lastError
-}
-
-func (w *errorWatcher) sendIfSet() chan<- error {
-	if w.lastError != nil {
-		return w.errorChannel
-	} else {
-		return nil
-	}
-}
-
-type pendingResponseHelper struct {
-	responseChannel chan patcher.BlockReponse
-	pendingResponse *patcher.BlockReponse
-}
-
-func (w *pendingResponseHelper) setResponse(r *patcher.BlockReponse) {
-	if w.pendingResponse != nil {
-		panic("setting a response when one is already set!")
-	}
-	w.pendingResponse = r
-}
-
-func (w *pendingResponseHelper) clear() {
-	w.pendingResponse = nil
-}
-
-func (w *pendingResponseHelper) Response() patcher.BlockReponse {
-	if w.pendingResponse == nil {
-		return patcher.BlockReponse{}
-	}
-	return *w.pendingResponse
-}
-
-func (w *pendingResponseHelper) sendIfPending() chan<- patcher.BlockReponse {
-	if w.pendingResponse != nil {
-		return w.responseChannel
-	} else {
-		return nil
-	}
-
-}
-
-type UintSlice []uint
-
-func (r UintSlice) Len() int {
-	return len(r)
-}
-
-func (r UintSlice) Swap(i, j int) {
-	r[i], r[j] = r[j], r[i]
-}
-
-func (r UintSlice) Less(i, j int) bool {
-	return r[i] < r[j]
 }
