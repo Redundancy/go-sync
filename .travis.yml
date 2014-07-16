@@ -2,5 +2,5 @@ language: go
 go:
   - tip
 script:
-  - go build github.com/Redundancy/go-sync/gosync
+  - go build  -o sync github.com/Redundancy/go-sync/gosync
   - go test -v github.com/Redundancy/go-sync/...
