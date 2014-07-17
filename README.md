@@ -1,5 +1,7 @@
 Go-Sync
 ------
+[![Build Status](https://travis-ci.org/Redundancy/go-sync.svg?branch=master)](https://travis-ci.org/Redundancy/go-sync)
+[![GoDoc](https://godoc.org/github.com/Redundancy/go-sync?status.svg)](https://godoc.org/github.com/Redundancy/go-sync)
 
 gosync is a library inspired by zsync and rsync. The intent is that it's easier to build upon than the zsync/rsync codebases. By writing it in Go, it's easier to create in a way that's cross-platform, can take advantage of multiple CPUs with built in benchmarks, code documentation and unit tests.
 
