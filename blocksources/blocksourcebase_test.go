@@ -231,10 +231,12 @@ func TestRequestCountLimiting(t *testing.T) {
 		MAX_CONCURRENCY = 2
 		REQUESTS        = 4
 	)
+	call_counter := 0
 
 	b := NewBlockSourceBase(
 		FunctionRequester(func(start, end int64) (data []byte, err error) {
 			counter <- 1
+			call_counter += 1
 			<-waiter
 			counter <- -1
 			return []byte{0, 0}, nil
@@ -256,6 +258,7 @@ func TestRequestCountLimiting(t *testing.T) {
 			}
 
 			count += change
+
 			if count > max {
 				max = count
 			}
@@ -279,5 +282,8 @@ func TestRequestCountLimiting(t *testing.T) {
 
 	if max != MAX_CONCURRENCY {
 		t.Errorf("Maximum requests in flight was greater than the requested concurrency: %v", max)
+	}
+	if call_counter != REQUESTS {
+		t.Errorf("Total number of requests is not expected: %v", call_counter)
 	}
 }

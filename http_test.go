@@ -3,11 +3,11 @@ package gosync
 import (
 	"bytes"
 	"fmt"
+	"github.com/Redundancy/go-sync/blocksources"
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/indexbuilder"
 	"github.com/Redundancy/go-sync/patcher/sequential"
-	"github.com/Redundancy/go-sync/util/blocksources"
 	"net/http"
 	"time"
 )

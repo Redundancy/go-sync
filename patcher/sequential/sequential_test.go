@@ -3,8 +3,8 @@ package sequential
 import (
 	"bytes"
 	"crypto/md5"
+	"github.com/Redundancy/go-sync/blocksources"
 	"github.com/Redundancy/go-sync/patcher"
-	"github.com/Redundancy/go-sync/util/blocksources"
 	"io"
 	"io/ioutil"
 	"strings"
