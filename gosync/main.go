@@ -6,12 +6,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/codegangsta/cli"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
+
+	"github.com/codegangsta/cli"
 )
 
 const (
@@ -24,8 +25,15 @@ func main() {
 	app.Name = "gosync"
 	app.Usage = "Build indexes, patches, patch files"
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{"profile", "enable HTTP profiling"},
-		cli.IntFlag{"profilePort", 6060, "The number of streams to use concurrently"},
+		cli.BoolFlag{
+			Name:  "profile",
+			Usage: "enable HTTP profiling",
+		},
+		cli.IntFlag{
+			Name:  "profilePort",
+			Value: 6060,
+			Usage: "The number of streams to use concurrently",
+		},
 	}
 
 	runtime.GOMAXPROCS(runtime.NumCPU())

@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/Redundancy/go-sync/filechecksum"
-	"github.com/codegangsta/cli"
 	"os"
 	"path/filepath"
+
+	"github.com/Redundancy/go-sync/filechecksum"
+	"github.com/codegangsta/cli"
 )
 
 func init() {
@@ -18,7 +19,11 @@ func init() {
 			Usage:     "build a .gosync file for a file",
 			Action:    Build,
 			Flags: []cli.Flag{
-				cli.IntFlag{"blocksize", DEFAULT_BLOCK_SIZE, "The block size to use for the gosync file"},
+				cli.IntFlag{
+					Name:  "blocksize",
+					Value: DEFAULT_BLOCK_SIZE,
+					Usage: "The block size to use for the gosync file",
+				},
 			},
 		},
 	)
