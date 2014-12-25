@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"os"
+	"runtime"
+	"time"
+
 	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	sync_index "github.com/Redundancy/go-sync/index"
 	"github.com/codegangsta/cli"
-	"io"
-	"os"
-	"runtime"
-	"time"
 )
 
 func init() {
@@ -25,7 +26,11 @@ func init() {
 			Description: `Compare a file with a reference index, and print statistics on the comparison and performance.`,
 			Action:      Diff,
 			Flags: []cli.Flag{
-				cli.IntFlag{"p", runtime.NumCPU(), "The number of streams to use concurrently"},
+				cli.IntFlag{
+					Name:  "p",
+					Value: runtime.NumCPU(),
+					Usage: "The number of streams to use concurrently",
+				},
 			},
 		},
 	)
