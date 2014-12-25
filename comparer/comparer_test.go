@@ -156,6 +156,21 @@ func TestSplitWithPartial(t *testing.T) {
 	}
 }
 
+func TestMultiSplit(t *testing.T) {
+	INPUT := []string{ "abcdef", "ghij"}
+	EXPECTED := []string{"abcd", "ef", "ghij"}
+	result := split(4, INPUT...)
+
+
+	if !reflect.DeepEqual(result, EXPECTED) {
+		t.Errorf(
+			"Lists differ: %v vs %v",
+			result,
+			EXPECTED,
+		)
+	}
+}
+
 func TestDetectsPrependedContent(t *testing.T) {
 	const BLOCK_SIZE = 4
 	var err error
