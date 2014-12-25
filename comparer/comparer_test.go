@@ -12,7 +12,7 @@ func CheckResults(
 	original, modified string,
 	results <-chan BlockMatchResult,
 	block_size uint,
-	expectedCount uint,
+	expectedResults []string,
 ) {
 	var resultStrings []string
 
@@ -48,9 +48,49 @@ func CheckResults(
 		resultStrings = append(resultStrings, orignal)
 	}
 
-	if len(resultStrings) != int(expectedCount) {
-		t.Errorf("%v blocks should have matched, only got: %v", expectedCount, resultStrings)
+	if len(resultStrings) != len(expectedResults) {
+		t.Fatalf(
+			"%v blocks should have matched, only got: %v",
+			len(expectedResults),
+			resultStrings,
+		)
 	}
+
+	for i, v := range expectedResults {
+		if resultStrings[i] != v {
+			t.Errorf("%v != %v", resultStrings[i], v)
+		}
+	}
+}
+
+func compare(
+	original string,
+	modified string,
+	block_size uint,
+) (results <-chan BlockMatchResult, err error) {
+
+	originalFileContent := bytes.NewBufferString(original)
+	generator := filechecksum.NewFileChecksumGenerator(block_size)
+
+	_, reference, err := indexbuilder.BuildChecksumIndex(
+		generator,
+		originalFileContent,
+	)
+
+	if err != nil {
+		return
+	}
+
+	modifiedContent := bytes.NewBufferString(modified)
+
+	results = (&Comparer{}).StartFindMatchingBlocks(
+		modifiedContent,
+		0,
+		generator,
+		reference,
+	)
+
+	return
 }
 
 func TestDetectsPrependedContent(t *testing.T) {
@@ -60,22 +100,10 @@ func TestDetectsPrependedContent(t *testing.T) {
 	const ORIGINAL_STRING = "abcdefghijklmnop"
 	const PREPENDED_STRING = "12" + ORIGINAL_STRING
 
-	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
-	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
-
+	results, err := compare(ORIGINAL_STRING, PREPENDED_STRING, BLOCK_SIZE)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	modifiedContent := bytes.NewBufferString(PREPENDED_STRING)
-
-	results := (&Comparer{}).StartFindMatchingBlocks(
-		modifiedContent,
-		0,
-		generator,
-		reference,
-	)
 
 	CheckResults(
 		t,
@@ -83,7 +111,7 @@ func TestDetectsPrependedContent(t *testing.T) {
 		PREPENDED_STRING,
 		results,
 		BLOCK_SIZE,
-		4,
+		[]string{"abcd", "efgh", "ijkl", "mnop"},
 	)
 }
 
@@ -95,22 +123,10 @@ func TestDetectsInjectedContent(t *testing.T) {
 	const ORIGINAL_STRING = A + B
 	const MODIFIED_STRING = A + "23" + B
 
-	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
-	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
-
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
-
-	results := (&Comparer{}).StartFindMatchingBlocks(
-		modifiedContent,
-		0,
-		generator,
-		reference,
-	)
 
 	CheckResults(
 		t,
@@ -118,7 +134,7 @@ func TestDetectsInjectedContent(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		4,
+		[]string{"abcd", "efgh", "ijkl", "mnop"},
 	)
 }
 
@@ -129,22 +145,10 @@ func TestDetectsAppendedContent(t *testing.T) {
 	const ORIGINAL_STRING = "abcdefghijklmnop"
 	const MODIFIED_STRING = ORIGINAL_STRING + "23"
 
-	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
-	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
-
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
-
-	results := (&Comparer{}).StartFindMatchingBlocks(
-		modifiedContent,
-		0,
-		generator,
-		reference,
-	)
 
 	CheckResults(
 		t,
@@ -152,7 +156,7 @@ func TestDetectsAppendedContent(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		4,
+		[]string{"abcd", "efgh", "ijkl", "mnop"},
 	)
 
 }
@@ -166,22 +170,10 @@ func TestDetectsModifiedContent(t *testing.T) {
 	const ORIGINAL_STRING = A + B + C
 	const MODIFIED_STRING = A + "i2kl" + C
 
-	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
-	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
-
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
-
-	results := (&Comparer{}).StartFindMatchingBlocks(
-		modifiedContent,
-		0,
-		generator,
-		reference,
-	)
 
 	CheckResults(
 		t,
@@ -189,7 +181,7 @@ func TestDetectsModifiedContent(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		3,
+		[]string{"abcd", "efgh", C},
 	)
 }
 
@@ -200,22 +192,10 @@ func TestDetectsPartialBlockAtEnd(t *testing.T) {
 	const ORIGINAL_STRING = A
 	const MODIFIED_STRING = A
 
-	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
-	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
-
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
-
-	results := (&Comparer{}).StartFindMatchingBlocks(
-		modifiedContent,
-		0,
-		generator,
-		reference,
-	)
 
 	CheckResults(
 		t,
@@ -223,7 +203,50 @@ func TestDetectsPartialBlockAtEnd(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		7, // [abcd efgh ijkl mnop qrst uvwx yz]
+		[]string{"abcd", "efgh", "ijkl", "mnop", "qrst", "uvwx", "yz"},
+	)
+}
+
+func TestDetectsModifiedPartialBlockAtEnd(t *testing.T) {
+	const BLOCK_SIZE = 4
+	var err error
+	const A = "abcdefghijklmnopqrstuvwx"
+	const ORIGINAL_STRING = A + "yz"
+	const MODIFIED_STRING = A + "23"
+
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	CheckResults(
+		t,
+		ORIGINAL_STRING,
+		MODIFIED_STRING,
+		results,
+		BLOCK_SIZE,
+		[]string{"abcd", "efgh", "ijkl", "mnop", "qrst", "uvwx"},
+	)
+}
+
+func TestDetectsUnmodifiedPartialBlockAtEnd(t *testing.T) {
+	const BLOCK_SIZE = 4
+	var err error
+	const A = "abcdefghijklmnopqrst"
+	const ORIGINAL_STRING = A + "uvwx" + "yz"
+	const MODIFIED_STRING = A + "us6x" + "yz"
+
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	CheckResults(
+		t,
+		ORIGINAL_STRING,
+		MODIFIED_STRING,
+		results,
+		BLOCK_SIZE,
+		[]string{"abcd", "efgh", "ijkl", "mnop", "qrst", "yz"},
 	)
 }
 
@@ -234,22 +257,10 @@ func TestMultipleResultsForDuplicatedBlocks(t *testing.T) {
 	const ORIGINAL_STRING = A + A
 	const MODIFIED_STRING = A
 
-	originalFileContent := bytes.NewBufferString(ORIGINAL_STRING)
-	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, reference, err := indexbuilder.BuildChecksumIndex(generator, originalFileContent)
-
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	modifiedContent := bytes.NewBufferString(MODIFIED_STRING)
-
-	results := (&Comparer{}).StartFindMatchingBlocks(
-		modifiedContent,
-		0,
-		generator,
-		reference,
-	)
 
 	CheckResults(
 		t,
@@ -257,6 +268,6 @@ func TestMultipleResultsForDuplicatedBlocks(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		2, // [abcd abcd]
+		[]string{A, A},
 	)
 }
