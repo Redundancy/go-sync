@@ -156,6 +156,30 @@ func TestResettingTheRollsum32(t *testing.T) {
 	}
 }
 
+func TestTruncatingPartiallyFilledBufferResultsInSameState(t *testing.T) {
+	r1 := NewRollsum32Base(4)
+	r2 := NewRollsum32Base(4)
+
+	r1.AddByte(2)
+	sum1 := make([]byte, 4)
+	r1.GetSum(sum1)
+
+	r2.AddByte(1)
+	r2.AddByte(2)
+	// Removal works from the left
+	r2.RemoveByte(1, 2)
+	sum2 := make([]byte, 4)
+	r2.GetSum(sum2)
+
+	if bytes.Compare(sum1, sum2) != 0 {
+		t.Errorf(
+			"Rollsums should not be different \"%v\" vs \"%v\"",
+			sum1,
+			sum2,
+		)
+	}
+}
+
 func TestThat32SumDoesNotChangeTheHashState(t *testing.T) {
 	r1 := NewRollsum32(4)
 

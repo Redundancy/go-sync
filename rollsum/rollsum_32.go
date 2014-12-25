@@ -1,3 +1,12 @@
+/*
+rollsum provides an implementation of a rolling checksum - a checksum that's efficient to advance a byte
+or more at a time. It is inspired by the rollsum in rsync, but differs in that the internal values used
+are 32bit integers - to make a conformant implementation, a find a replace on "32" should be almost sufficient
+(although it would be highly recommended to test against known values from the original implementation).
+
+Rollsum32 supports the hash.Hash implementation, but is not used much in go-sync, mostly in order to
+share and access the underlying circular buffer storage, and use the implementation as efficiently as possible.
+*/
 package rollsum
 
 import (
@@ -13,7 +22,9 @@ func NewRollsum32(blocksize uint) *Rollsum32 {
 	}
 }
 
-// Uses 16bit internal values, 4 byte hashes
+// Rollsum32 is a rolling checksum implemenation
+// inspired by rsync, but with 32bit internal values
+// Create one using NewRollsum32
 type Rollsum32 struct {
 	Rollsum32Base
 	buffer *circularbuffer.C2
@@ -38,10 +49,12 @@ func (r *Rollsum32) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// The most efficient byte length to call Write with
 func (r *Rollsum32) BlockSize() int {
 	return int(r.blockSize)
 }
 
+// the number of bytes
 func (r *Rollsum32) Size() int {
 	return 4
 }
