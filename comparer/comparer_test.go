@@ -5,6 +5,7 @@ import (
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/indexbuilder"
 	"testing"
+	"reflect"
 )
 
 func CheckResults(
@@ -93,6 +94,68 @@ func compare(
 	return
 }
 
+// Splits successive strings into blocks of size n
+// 2, ABCD -> AB, CD
+// 2, ABCD, E, FG -> AB, CD, E, FG
+func split( n int, ss... string) (result []string) {
+	totalLength := 0
+	for _, s := range ss {
+		totalLength += len(s)/n + 1
+	}
+	result = make([]string, 0, totalLength)
+
+	for _, x := range ss {
+		i := int(0)
+		for i + n < len(x) {
+			result = append(
+				result,
+				x[i:i+n],
+			)
+
+			i += n
+		}
+
+		if i < len(x) - 1 {
+			result = append(
+				result,
+				x[i:],
+			)
+		}
+	}
+
+	return
+}
+
+func TestSplit(t *testing.T) {
+	INPUT := "abcdef"
+	EXPECTED := []string{"ab", "cd", "ef"}
+	result := split(2, INPUT)
+
+
+	if !reflect.DeepEqual(result, EXPECTED) {
+		t.Errorf(
+			"Lists differ: %v vs %v",
+			result,
+			EXPECTED,
+		)
+	}
+}
+
+func TestSplitWithPartial(t *testing.T) {
+	INPUT := "abcdef"
+	EXPECTED := []string{"abcd", "ef"}
+	result := split(4, INPUT)
+
+
+	if !reflect.DeepEqual(result, EXPECTED) {
+		t.Errorf(
+			"Lists differ: %v vs %v",
+			result,
+			EXPECTED,
+		)
+	}
+}
+
 func TestDetectsPrependedContent(t *testing.T) {
 	const BLOCK_SIZE = 4
 	var err error
@@ -111,7 +174,7 @@ func TestDetectsPrependedContent(t *testing.T) {
 		PREPENDED_STRING,
 		results,
 		BLOCK_SIZE,
-		[]string{"abcd", "efgh", "ijkl", "mnop"},
+		split(4, ORIGINAL_STRING),
 	)
 }
 
@@ -134,7 +197,7 @@ func TestDetectsInjectedContent(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		[]string{"abcd", "efgh", "ijkl", "mnop"},
+		split(4, A, B),
 	)
 }
 
@@ -156,9 +219,8 @@ func TestDetectsAppendedContent(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		[]string{"abcd", "efgh", "ijkl", "mnop"},
+		split(4, ORIGINAL_STRING),
 	)
-
 }
 
 func TestDetectsModifiedContent(t *testing.T) {
@@ -181,7 +243,7 @@ func TestDetectsModifiedContent(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		[]string{"abcd", "efgh", C},
+		split(4, A, C),
 	)
 }
 
@@ -203,7 +265,7 @@ func TestDetectsPartialBlockAtEnd(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		[]string{"abcd", "efgh", "ijkl", "mnop", "qrst", "uvwx", "yz"},
+		split(4, A),
 	)
 }
 
@@ -224,7 +286,7 @@ func TestDetectsModifiedPartialBlockAtEnd(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		[]string{"abcd", "efgh", "ijkl", "mnop", "qrst", "uvwx"},
+		split(4, A),
 	)
 }
 
@@ -246,7 +308,7 @@ func TestDetectsUnmodifiedPartialBlockAtEnd(t *testing.T) {
 		MODIFIED_STRING,
 		results,
 		BLOCK_SIZE,
-		[]string{"abcd", "efgh", "ijkl", "mnop", "qrst", "yz"},
+		split(4, A, "yz"),
 	)
 }
 
