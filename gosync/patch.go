@@ -4,6 +4,11 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"runtime"
+
 	"github.com/Redundancy/go-sync/blocksources"
 	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/comparer"
@@ -11,10 +16,6 @@ import (
 	sync_index "github.com/Redundancy/go-sync/index"
 	"github.com/Redundancy/go-sync/patcher/sequential"
 	"github.com/codegangsta/cli"
-	"io"
-	"io/ioutil"
-	"os"
-	"runtime"
 )
 
 func init() {
@@ -32,7 +33,11 @@ The index should be produced by "gosync build".
 <output> is optional. If not specified, the local file will be overwritten when done.`,
 			Action: Patch,
 			Flags: []cli.Flag{
-				cli.IntFlag{"p", runtime.NumCPU(), "The number of streams to use concurrently"},
+				cli.IntFlag{
+					Name:  "p",
+					Value: runtime.NumCPU(),
+					Usage: "The number of streams to use concurrently",
+				},
 			},
 		},
 	)
