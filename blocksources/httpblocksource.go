@@ -15,11 +15,17 @@ var UrlNotFoundError = errors.New("404 Error on URL")
 func NewHttpBlockSource(
 	url string,
 	concurrentRequests int,
+	resolver BlockSourceOffsetResolver,
 ) *BlockSourceBase {
-	return NewBlockSourceBase(&HttpRequester{
-		url:    url,
-		client: http.DefaultClient,
-	}, concurrentRequests, 4*MB)
+	return NewBlockSourceBase(
+		&HttpRequester{
+			url:    url,
+			client: http.DefaultClient,
+		},
+		resolver,
+		concurrentRequests,
+		4*MB,
+	)
 }
 
 // This class provides the implementation of BlockSourceRequester for BlockSourceBase

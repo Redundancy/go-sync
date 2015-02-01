@@ -85,15 +85,15 @@ func (r UintSlice) Less(i, j int) bool {
 }
 
 type asyncResult struct {
-	blockID uint
-	data    []byte
-	err     error
+	startBlockID uint
+	endBlockID   uint
+	data         []byte
+	err          error
 }
 
 type queuedRequest struct {
 	startBlockID uint
-	startOffset  int64
-	endOffset    int64
+	endBlockID   uint
 }
 
 type queuedRequestList []queuedRequest
@@ -108,4 +108,10 @@ func (r queuedRequestList) Swap(i, j int) {
 
 func (r queuedRequestList) Less(i, j int) bool {
 	return r[i].startBlockID < r[j].startBlockID
+}
+
+func MakeNullFixedSizeResolver(blockSize uint64) BlockSourceOffsetResolver {
+	return &FixedSizeBlockResolver{
+		BlockSize: blockSize,
+	}
 }

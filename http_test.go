@@ -82,7 +82,11 @@ func Example_httpBlockSource() {
 	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount) - 1)
 
 	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
-	remoteReferenceSource := blocksources.NewHttpBlockSource(LOCAL_URL+"/content", 2)
+	remoteReferenceSource := blocksources.NewHttpBlockSource(
+		LOCAL_URL+"/content",
+		2,
+		blocksources.MakeNullFixedSizeResolver(BLOCK_SIZE),
+	)
 
 	err = sequential.SequentialPatcher(
 		bytes.NewReader([]byte(LOCAL_VERSION)),

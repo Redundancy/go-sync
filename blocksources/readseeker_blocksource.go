@@ -13,10 +13,18 @@ type ReadSeeker interface {
 	Seek(offset int64, whence int) (int64, error)
 }
 
-func NewReadSeekerBlockSource(r ReadSeeker) *BlockSourceBase {
-	return NewBlockSourceBase(&ReadSeekerRequester{
-		rs: r,
-	}, 1, 8*MB)
+func NewReadSeekerBlockSource(
+	r ReadSeeker,
+	resolver BlockSourceOffsetResolver,
+) *BlockSourceBase {
+	return NewBlockSourceBase(
+		&ReadSeekerRequester{
+			rs: r,
+		},
+		resolver,
+		1,
+		8*MB,
+	)
 }
 
 type ReadSeekerRequester struct {

@@ -5,10 +5,9 @@ import (
 	"sort"
 )
 
-// TODO: patcher.MissingBlockSpan does not define any offsets (start or length)
-// Get these from an interface instead of calculating them with the blocksize,
-// and then we can have compressed block spans
-
+// BlockSourceRequester does synchronous requests on a remote source of blocks
+// concurrency is handled by the BlockSourceBase. This provides a simple way
+// of implementing a particular
 type BlockSourceRequester interface {
 	// This method is called on multiple goroutines, and must
 	// support simultaneous requests
@@ -19,20 +18,32 @@ type BlockSourceRequester interface {
 	IsFatal(err error) bool
 }
 
+// A BlockSourceOffsetResolver resolves a blockID to a start offset and and end offset in a file
+// it also handles splitting up ranges of blocks into multiple requests, allowing requests to be split down to the
+// block size, and handling of compressed blocks (given a resolver that can work out the correct range to query for,
+// and a BlockSourceRequester that will decompress the result into a full sized block)
+type BlockSourceOffsetResolver interface {
+	GetBlockStartOffset(blockID uint) int64
+	GetBlockEndOffset(blockID uint) int64
+	SplitBlockRangeToDesiredSize(startBlockID, endBlockID uint) []queuedRequest
+}
+
 func NewBlockSourceBase(
 	requester BlockSourceRequester,
+	resolver BlockSourceOffsetResolver,
 	concurrentRequestCount int,
 	concurrentBytes int64,
 ) *BlockSourceBase {
 
 	b := &BlockSourceBase{
-		Requester:          requester,
-		ConcurrentRequests: concurrentRequestCount,
-		ConcurrentBytes:    concurrentBytes,
-		exitChannel:        make(chan bool),
-		errorChannel:       make(chan error),
-		responseChannel:    make(chan patcher.BlockReponse),
-		requestChannel:     make(chan patcher.MissingBlockSpan),
+		Requester:           requester,
+		BlockSourceResolver: resolver,
+		ConcurrentRequests:  concurrentRequestCount,
+		ConcurrentBytes:     concurrentBytes,
+		exitChannel:         make(chan bool),
+		errorChannel:        make(chan error),
+		responseChannel:     make(chan patcher.BlockReponse),
+		requestChannel:      make(chan patcher.MissingBlockSpan),
 	}
 
 	go b.loop()
@@ -46,7 +57,8 @@ func NewBlockSourceBase(
 // BlockSourceBase implements patcher.BlockSource, and if it's good enough,
 // perhaps nobody else ever will have to.
 type BlockSourceBase struct {
-	Requester BlockSourceRequester
+	Requester           BlockSourceRequester
+	BlockSourceResolver BlockSourceOffsetResolver
 
 	// The number of requests that BlockSourceBase may service at once
 	ConcurrentRequests int
@@ -129,14 +141,15 @@ func (s *BlockSourceBase) loop() {
 			sort.Sort(sort.Reverse(requestOrdering))
 			go func() {
 				result, err := s.Requester.DoRequest(
-					nextRequest.startOffset,
-					nextRequest.endOffset,
+					s.BlockSourceResolver.GetBlockStartOffset(nextRequest.startBlockID),
+					s.BlockSourceResolver.GetBlockEndOffset(nextRequest.endBlockID),
 				)
 
 				resultChan <- asyncResult{
-					blockID: nextRequest.startBlockID,
-					data:    result,
-					err:     err,
+					startBlockID: nextRequest.startBlockID,
+					endBlockID:   nextRequest.endBlockID,
+					data:         result,
+					err:          err,
 				}
 			}()
 
@@ -146,21 +159,13 @@ func (s *BlockSourceBase) loop() {
 
 		select {
 		case newRequest := <-s.requestChannel:
-			// TODO: get this from an interface
-			startOffset := int64(newRequest.StartBlock) * newRequest.BlockSize
-			endOffset := int64(newRequest.EndBlock+1) * newRequest.BlockSize
-
-			/* Instead of splitting a large range and handling it seperately
-			(which would prevent it from being written until the whole thing was complete)
-			we want to split it into blocks, which means that the request splitter
-			must be able to know how to divide up a block range into individual blocks
-			*/
-
-			requestQueue = append(requestQueue, queuedRequest{
-				startBlockID: newRequest.StartBlock,
-				startOffset:  startOffset,
-				endOffset:    endOffset,
-			})
+			requestQueue = append(
+				requestQueue,
+				s.BlockSourceResolver.SplitBlockRangeToDesiredSize(
+					newRequest.StartBlock,
+					newRequest.EndBlock,
+				)...,
+			)
 
 			sort.Sort(sort.Reverse(requestQueue))
 
@@ -179,7 +184,7 @@ func (s *BlockSourceBase) loop() {
 
 			responseOrdering = append(responseOrdering,
 				patcher.BlockReponse{
-					StartBlock: result.blockID,
+					StartBlock: result.startBlockID,
 					Data:       result.data,
 				},
 			)
@@ -191,7 +196,7 @@ func (s *BlockSourceBase) loop() {
 			// the response. Otherwise, wait.
 			lowestRequest := requestOrdering[len(requestOrdering)-1]
 
-			if lowestRequest == result.blockID {
+			if lowestRequest == result.startBlockID {
 				lowestResponse := responseOrdering[len(responseOrdering)-1]
 				pendingResponse.clear()
 				pendingResponse.setResponse(&lowestResponse)

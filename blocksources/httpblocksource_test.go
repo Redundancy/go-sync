@@ -65,7 +65,11 @@ func TestHandler(t *testing.T) {
 }
 
 func TestHttpBlockSource(t *testing.T) {
-	b := NewHttpBlockSource(LOCAL_URL+"/", 2)
+	b := NewHttpBlockSource(
+		LOCAL_URL+"/",
+		2,
+		MakeNullFixedSizeResolver(4),
+	)
 
 	err := b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
@@ -92,7 +96,11 @@ func TestHttpBlockSource(t *testing.T) {
 }
 
 func TestHttpBlockSource404(t *testing.T) {
-	b := NewHttpBlockSource(LOCAL_URL+"/404", 2)
+	b := NewHttpBlockSource(
+		LOCAL_URL+"/404",
+		2,
+		MakeNullFixedSizeResolver(4),
+	)
 
 	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
@@ -117,7 +125,11 @@ func TestHttpBlockSource404(t *testing.T) {
 }
 
 func TestHttpBlockSourceOffsetBlockRequest(t *testing.T) {
-	b := NewHttpBlockSource(LOCAL_URL+"/", 2)
+	b := NewHttpBlockSource(
+		LOCAL_URL+"/",
+		2,
+		MakeNullFixedSizeResolver(4),
+	)
 
 	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
@@ -139,7 +151,11 @@ func TestHttpBlockSourceOffsetBlockRequest(t *testing.T) {
 }
 
 func TestHttpBlockSourcePartialContentRequest(t *testing.T) {
-	b := NewHttpBlockSource(LOCAL_URL+"/partial", 2)
+	b := NewHttpBlockSource(
+		LOCAL_URL+"/partial",
+		2,
+		MakeNullFixedSizeResolver(4),
+	)
 
 	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,

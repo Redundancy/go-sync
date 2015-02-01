@@ -9,7 +9,10 @@ import (
 const STRING_DATA = "abcdefghijklmnopqrst"
 
 var BYTE_BLOCK_SOURCE = NewReadSeekerBlockSource(
-	bytes.NewReader([]byte(STRING_DATA)),
+	bytes.NewReader(
+		[]byte(STRING_DATA),
+	),
+	MakeNullFixedSizeResolver(4),
 )
 
 func TestReadFirstBlock(t *testing.T) {

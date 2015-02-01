@@ -116,6 +116,7 @@ func Example() {
 	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
 	remoteReferenceSource := blocksources.NewReadSeekerBlockSource(
 		bytes.NewReader([]byte(REFERENCE)),
+		blocksources.MakeNullFixedSizeResolver(BLOCK_SIZE),
 	)
 
 	err = sequential.SequentialPatcher(

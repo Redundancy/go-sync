@@ -202,8 +202,12 @@ func Patch(c *cli.Context) {
 	mergedBlocks := merger.GetMergedBlocks()
 	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
 
-	// TODO: is source is a local file, use the reader block source
-	source := blocksources.NewHttpBlockSource(reference_arg, 4)
+	// TODO: if source is a local file, use the reader block source
+	source := blocksources.NewHttpBlockSource(
+		reference_arg,
+		4,
+		blocksources.MakeNullFixedSizeResolver(uint64(blocksize)),
+	)
 
 	err = sequential.SequentialPatcher(
 		local_file,

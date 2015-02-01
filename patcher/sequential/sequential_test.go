@@ -73,7 +73,10 @@ func TestPatchingStart(t *testing.T) {
 
 	err := SequentialPatcher(
 		LOCAL,
-		blocksources.NewReadSeekerBlockSource(stringToReadSeeker(REFERENCE_STRING)),
+		blocksources.NewReadSeekerBlockSource(
+			stringToReadSeeker(REFERENCE_STRING),
+			blocksources.MakeNullFixedSizeResolver(BLOCKSIZE),
+		),
 		missing,
 		matched,
 		1024,
@@ -120,7 +123,10 @@ func TestPatchingEnd(t *testing.T) {
 
 	err := SequentialPatcher(
 		LOCAL,
-		blocksources.NewReadSeekerBlockSource(stringToReadSeeker(REFERENCE_STRING)),
+		blocksources.NewReadSeekerBlockSource(
+			stringToReadSeeker(REFERENCE_STRING),
+			blocksources.MakeNullFixedSizeResolver(BLOCKSIZE),
+		),
 		missing,
 		matched,
 		1024,
@@ -158,7 +164,10 @@ func TestPatchingEntirelyMissing(t *testing.T) {
 
 	err := SequentialPatcher(
 		LOCAL,
-		blocksources.NewReadSeekerBlockSource(stringToReadSeeker(REFERENCE_STRING)),
+		blocksources.NewReadSeekerBlockSource(
+			stringToReadSeeker(REFERENCE_STRING),
+			blocksources.MakeNullFixedSizeResolver(BLOCKSIZE),
+		),
 		missing,
 		matched,
 		1024,
