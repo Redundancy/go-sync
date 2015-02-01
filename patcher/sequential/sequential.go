@@ -12,6 +12,10 @@ import (
 	"io"
 )
 
+const (
+	ABSOLUTE_POSITION = 0
+)
+
 /*
 This simple example currently doesn't do any pipelining of needed blocks, nor does it deal with
 blocks being delivered out of order.
@@ -53,7 +57,7 @@ func SequentialPatcher(
 			firstMatched := locallyAvailableBlocks[0]
 
 			// we have the current block range in the local file
-			localFile.Seek(firstMatched.MatchOffset, 0)
+			localFile.Seek(firstMatched.MatchOffset, ABSOLUTE_POSITION)
 			blockSizeToRead := int64(firstMatched.EndBlock-firstMatched.StartBlock+1) * firstMatched.BlockSize
 
 			if _, err := io.Copy(output, io.LimitReader(localFile, blockSizeToRead)); err != nil {
@@ -73,11 +77,11 @@ func SequentialPatcher(
 					if _, err := output.Write(result.Data); err != nil {
 						return err
 					} else {
-						advance := uint(int64(len(result.Data)) / firstMissing.BlockSize)
-						if int64(len(result.Data))%firstMissing.BlockSize != 0 {
-							advance += 1
-						}
-						currentBlock += advance
+						currentBlock += calculateNumberOfCompletedBlocks(
+							len(result.Data),
+							firstMissing.BlockSize,
+						)
+
 						requiredRemoteBlocks = requiredRemoteBlocks[1:]
 					}
 				} else {
@@ -106,4 +110,16 @@ func withinFirstBlockOfRemoteBlocks(currentBlock uint, remoteBlocks []patcher.Mi
 
 func withinFirstBlockOfLocalBlocks(currentBlock uint, localBlocks []patcher.FoundBlockSpan) bool {
 	return len(localBlocks) > 0 && localBlocks[0].StartBlock <= currentBlock && localBlocks[0].EndBlock >= currentBlock
+}
+
+func calculateNumberOfCompletedBlocks(resultLength int, blockSize int64) (completedBlockCount uint) {
+	// TODO: lots of casting to uint here, is it safe?
+	completedBlockCount = uint(resultLength) / uint(blockSize)
+
+	// round up in the case of a partial block (last block may not be full sized)
+	if uint(resultLength)%uint(blockSize) != 0 {
+		completedBlockCount += 1
+	}
+
+	return
 }
