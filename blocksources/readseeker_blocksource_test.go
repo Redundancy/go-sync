@@ -13,7 +13,7 @@ var BYTE_BLOCK_SOURCE = NewReadSeekerBlockSource(
 )
 
 func TestReadFirstBlock(t *testing.T) {
-	BYTE_BLOCK_SOURCE.RequestBlock(
+	BYTE_BLOCK_SOURCE.RequestBlocks(
 		patcher.MissingBlockSpan{
 			BlockSize:  4,
 			StartBlock: 0,

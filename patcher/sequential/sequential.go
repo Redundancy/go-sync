@@ -19,20 +19,20 @@ blocks being delivered out of order.
 func SequentialPatcher(
 	localFile io.ReadSeeker,
 	reference patcher.BlockSource,
-	missingLocal []patcher.MissingBlockSpan,
-	matchedLocal []patcher.FoundBlockSpan,
+	requiredRemoteBlocks []patcher.MissingBlockSpan,
+	locallyAvailableBlocks []patcher.FoundBlockSpan,
 	maxBlockStorage uint64, // the amount of memory we're allowed to use for temporary data storage
 	output io.Writer,
 ) error {
 
 	maxBlockMissing := uint(0)
-	if len(missingLocal) > 0 {
-		maxBlockMissing = missingLocal[len(missingLocal)-1].EndBlock
+	if len(requiredRemoteBlocks) > 0 {
+		maxBlockMissing = requiredRemoteBlocks[len(requiredRemoteBlocks)-1].EndBlock
 	}
 
 	maxBlockFound := uint(0)
-	if len(matchedLocal) > 0 {
-		maxBlockFound = matchedLocal[len(matchedLocal)-1].EndBlock
+	if len(locallyAvailableBlocks) > 0 {
+		maxBlockFound = locallyAvailableBlocks[len(locallyAvailableBlocks)-1].EndBlock
 	}
 
 	if reference == nil {
@@ -45,14 +45,12 @@ func SequentialPatcher(
 	}
 
 	currentBlock := uint(0)
-	missing := missingLocal
-	matched := matchedLocal
 
 	// TODO: find a way to test this, since it seemed to be the cause of an issue
 	for currentBlock <= maxBlock {
 		// where is the next block supposed to come from?
-		if len(matched) > 0 && matched[0].StartBlock <= currentBlock && matched[0].EndBlock >= currentBlock {
-			firstMatched := matched[0]
+		if withinFirstBlockOfLocalBlocks(currentBlock, locallyAvailableBlocks) {
+			firstMatched := locallyAvailableBlocks[0]
 
 			// we have the current block range in the local file
 			localFile.Seek(firstMatched.MatchOffset, 0)
@@ -63,11 +61,11 @@ func SequentialPatcher(
 			}
 
 			currentBlock = firstMatched.EndBlock + 1
-			matched = matched[1:]
+			locallyAvailableBlocks = locallyAvailableBlocks[1:]
 
-		} else if len(missing) > 0 && missing[0].StartBlock <= currentBlock && missing[0].EndBlock >= currentBlock {
-			firstMissing := missing[0]
-			reference.RequestBlock(firstMissing)
+		} else if withinFirstBlockOfRemoteBlocks(currentBlock, requiredRemoteBlocks) {
+			firstMissing := requiredRemoteBlocks[0]
+			reference.RequestBlocks(firstMissing)
 
 			select {
 			case result := <-reference.GetResultChannel():
@@ -80,7 +78,7 @@ func SequentialPatcher(
 							advance += 1
 						}
 						currentBlock += advance
-						missing = missing[1:]
+						requiredRemoteBlocks = requiredRemoteBlocks[1:]
 					}
 				} else {
 					return fmt.Errorf("Received unexpected block: %v", result.StartBlock)
@@ -90,9 +88,22 @@ func SequentialPatcher(
 			}
 
 		} else {
-			return fmt.Errorf("Could not find block in missing or matched list: %v - %v %v", currentBlock, missing, matched)
+			return fmt.Errorf(
+				"Could not find block in missing or matched list: %v - %v %v",
+				currentBlock,
+				requiredRemoteBlocks,
+				locallyAvailableBlocks,
+			)
 		}
 	}
 
 	return nil
+}
+
+func withinFirstBlockOfRemoteBlocks(currentBlock uint, remoteBlocks []patcher.MissingBlockSpan) bool {
+	return len(remoteBlocks) > 0 && remoteBlocks[0].StartBlock <= currentBlock && remoteBlocks[0].EndBlock >= currentBlock
+}
+
+func withinFirstBlockOfLocalBlocks(currentBlock uint, localBlocks []patcher.FoundBlockSpan) bool {
+	return len(localBlocks) > 0 && localBlocks[0].StartBlock <= currentBlock && localBlocks[0].EndBlock >= currentBlock
 }

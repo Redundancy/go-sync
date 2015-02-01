@@ -84,7 +84,7 @@ func TestBlockSourceBaseError(t *testing.T) {
 	b := NewBlockSourceBase(&erroringRequester{}, 1, 1024)
 	defer b.Close()
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
 		StartBlock: 1,
 		EndBlock:   1,
@@ -110,7 +110,7 @@ func TestBlockSourceRequest(t *testing.T) {
 	)
 	defer b.Close()
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
 		StartBlock: 1,
 		EndBlock:   1,
@@ -138,13 +138,13 @@ func TestConcurrentBlockRequests(t *testing.T) {
 	)
 	defer b.Close()
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  2,
 		StartBlock: 0,
 		EndBlock:   0,
 	})
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  2,
 		StartBlock: 1,
 		EndBlock:   1,
@@ -184,13 +184,13 @@ func TestOutOfOrderRequestCompletion(t *testing.T) {
 	)
 	defer b.Close()
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  1,
 		StartBlock: 0,
 		EndBlock:   0,
 	})
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  1,
 		StartBlock: 1,
 		EndBlock:   1,
@@ -266,7 +266,7 @@ func TestRequestCountLimiting(t *testing.T) {
 	}()
 
 	for i := 0; i < REQUESTS; i++ {
-		b.RequestBlock(patcher.MissingBlockSpan{
+		b.RequestBlocks(patcher.MissingBlockSpan{
 			BlockSize:  1,
 			StartBlock: uint(i),
 			EndBlock:   uint(i),

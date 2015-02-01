@@ -5,6 +5,10 @@ import (
 	"sort"
 )
 
+// TODO: patcher.MissingBlockSpan does not define any offsets (start or length)
+// Get these from an interface instead of calculating them with the blocksize,
+// and then we can have compressed block spans
+
 type BlockSourceRequester interface {
 	// This method is called on multiple goroutines, and must
 	// support simultaneous requests
@@ -69,7 +73,7 @@ func (s *BlockSourceBase) ReadBytes() int64 {
 	return s.bytesRequested
 }
 
-func (s *BlockSourceBase) RequestBlock(block patcher.MissingBlockSpan) error {
+func (s *BlockSourceBase) RequestBlocks(block patcher.MissingBlockSpan) error {
 	s.requestChannel <- block
 	return nil
 }
@@ -142,14 +146,20 @@ func (s *BlockSourceBase) loop() {
 
 		select {
 		case newRequest := <-s.requestChannel:
-			// TODO: limit size of individual requests, so that we can
-			// ensure that we use multiple concurrent connections, even when there
-			// is only a single continuous missing block
+			// TODO: get this from an interface
+			startOffset := int64(newRequest.StartBlock) * newRequest.BlockSize
+			endOffset := int64(newRequest.EndBlock+1) * newRequest.BlockSize
+
+			/* Instead of splitting a large range and handling it seperately
+			(which would prevent it from being written until the whole thing was complete)
+			we want to split it into blocks, which means that the request splitter
+			must be able to know how to divide up a block range into individual blocks
+			*/
 
 			requestQueue = append(requestQueue, queuedRequest{
 				startBlockID: newRequest.StartBlock,
-				startOffset:  int64(newRequest.StartBlock) * newRequest.BlockSize,
-				endOffset:    int64(newRequest.EndBlock+1) * newRequest.BlockSize,
+				startOffset:  startOffset,
+				endOffset:    endOffset,
 			})
 
 			sort.Sort(sort.Reverse(requestQueue))

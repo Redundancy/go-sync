@@ -67,7 +67,7 @@ func TestHandler(t *testing.T) {
 func TestHttpBlockSource(t *testing.T) {
 	b := NewHttpBlockSource(LOCAL_URL+"/", 2)
 
-	err := b.RequestBlock(patcher.MissingBlockSpan{
+	err := b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
 		StartBlock: 0,
 		EndBlock:   0,
@@ -94,7 +94,7 @@ func TestHttpBlockSource(t *testing.T) {
 func TestHttpBlockSource404(t *testing.T) {
 	b := NewHttpBlockSource(LOCAL_URL+"/404", 2)
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
 		StartBlock: 0,
 		EndBlock:   0,
@@ -119,7 +119,7 @@ func TestHttpBlockSource404(t *testing.T) {
 func TestHttpBlockSourceOffsetBlockRequest(t *testing.T) {
 	b := NewHttpBlockSource(LOCAL_URL+"/", 2)
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
 		StartBlock: 1,
 		EndBlock:   3,
@@ -141,7 +141,7 @@ func TestHttpBlockSourceOffsetBlockRequest(t *testing.T) {
 func TestHttpBlockSourcePartialContentRequest(t *testing.T) {
 	b := NewHttpBlockSource(LOCAL_URL+"/partial", 2)
 
-	b.RequestBlock(patcher.MissingBlockSpan{
+	b.RequestBlocks(patcher.MissingBlockSpan{
 		BlockSize:  4,
 		StartBlock: 1,
 		EndBlock:   1,
