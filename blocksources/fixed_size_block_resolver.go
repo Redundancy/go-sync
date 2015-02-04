@@ -23,8 +23,14 @@ func (r *FixedSizeBlockResolver) SplitBlockRangeToDesiredSize(startBlockID, endB
 			},
 		}
 	}
+
+	maxSize := r.MaxDesiredRequestSize
+	if r.MaxDesiredRequestSize < r.BlockSize {
+		maxSize = r.BlockSize
+	}
+
 	// how many blocks is the desired size?
-	blockCountPerRequest := uint(r.MaxDesiredRequestSize / r.BlockSize)
+	blockCountPerRequest := uint(maxSize / r.BlockSize)
 
 	requests := make([]queuedRequest, 0, (endBlockID-startBlockID)/blockCountPerRequest+1)
 	currentBlockID := startBlockID
