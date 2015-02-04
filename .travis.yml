@@ -1,6 +1,10 @@
 language: go
 go:
   - tip
+before_install:
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 script:
   - go build  -o sync github.com/Redundancy/go-sync/gosync
-  - go test -v github.com/Redundancy/go-sync/...
+  - $HOME/gopath/bin/goveralls -service=travis-ci
