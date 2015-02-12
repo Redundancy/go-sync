@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -58,7 +57,7 @@ func Diff(c *cli.Context) {
 
 	defer reference_file.Close()
 
-	e := binary.Read(reference_file, binary.LittleEndian, &blocksize)
+	_, _, _, blocksize, e := read_headers_and_check(reference_file, magic_string, major_version)
 
 	if e != nil {
 		fmt.Printf("Error loading index: %v", e)
@@ -139,10 +138,22 @@ func Diff(c *cli.Context) {
 
 	fmt.Println("Comparisons:", compare.Comparisons)
 	fmt.Println("Weak hash hits:", compare.WeakHashHits)
-	fmt.Println("Weak hit rate:", 100.0*float64(compare.WeakHashHits)/float64(compare.Comparisons))
+
+	if compare.Comparisons > 0 {
+		fmt.Printf(
+			"Weak hit rate: %.2f%%\n",
+			100.0*float64(compare.WeakHashHits)/float64(compare.Comparisons),
+		)
+	}
 
 	fmt.Println("Strong hash hits:", compare.StrongHashHits)
-	fmt.Println("Weak hash error rate:", 100.0*float64(compare.WeakHashHits-compare.StrongHashHits)/float64(compare.WeakHashHits))
+	if compare.WeakHashHits > 0 {
+		fmt.Printf(
+			"Weak hash error rate: %.2f%%\n",
+			100.0*float64(compare.WeakHashHits-compare.StrongHashHits)/float64(compare.WeakHashHits),
+		)
+	}
+
 	fmt.Println("Total matched bytes:", totalMatchingSize)
 	fmt.Println("Total matched blocks:", matchedBlockCountAfterMerging)
 
@@ -157,6 +168,6 @@ func Diff(c *cli.Context) {
 		totalMissingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
 	}
 
-	fmt.Println("Total missing bytes:", totalMissingSize)
+	fmt.Println("Approximate missing bytes:", totalMissingSize)
 	fmt.Println("Time taken:", time.Now().Sub(start_time))
 }

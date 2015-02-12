@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/patcher"
@@ -102,4 +104,51 @@ func toPatcherMissingSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.
 	}
 
 	return result
+}
+
+func write_headers(f *os.File, magic string, blocksize uint32, versions []uint16) (err error) {
+	if _, err = f.WriteString(magic_string); err != nil {
+		return
+	}
+
+	for _, v := range versions {
+		if err = binary.Write(f, binary.LittleEndian, v); err != nil {
+			return
+		}
+	}
+
+	err = binary.Write(f, binary.LittleEndian, blocksize)
+	return
+}
+
+// reads the file headers and checks the magic string, then the semantic versioning
+func read_headers_and_check(r io.Reader, magic string, required_major_version uint16) (major, minor, patch uint16, blocksize uint32, err error) {
+	b := make([]byte, len(magic_string))
+
+	if _, err = r.Read(b); err != nil {
+		return
+	} else if string(b) != magic_string {
+		err = errors.New("file header does not match magic string. Not a valid gosync file.")
+		return
+	}
+
+	for _, v := range []*uint16{&major, &minor, &patch} {
+		err = binary.Read(r, binary.LittleEndian, v)
+		if err != nil {
+			return
+		}
+	}
+
+	if required_major_version != major {
+		err = fmt.Errorf(
+			"The major version of the gosync file (%v.%v.%v) does not match the tool (%v.%v.%v).",
+			major, minor, patch,
+			major_version, minor_version, patch_version,
+		)
+
+		return
+	}
+
+	err = binary.Read(r, binary.LittleEndian, &blocksize)
+	return
 }

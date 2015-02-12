@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/codegangsta/cli"
@@ -59,12 +59,21 @@ func Build(c *cli.Context) {
 
 	defer outputFile.Close()
 
-	// Embed the blocksize as a uint32 at the front
-	binary.Write(outputFile, binary.LittleEndian, &blocksize)
+	if err = write_headers(outputFile, magic_string, blocksize, []uint16{major_version, minor_version, patch_version}); err != nil {
+		fmt.Fprintf(
+			os.Stderr,
+			"Error getting file info: %v\n",
+			filename,
+			err,
+		)
+		os.Exit(2)
+	}
 
 	// TODO: write the blocksize first
 	//outputFile.Write(binary.LittleEndian.)
+	start := time.Now()
 	_, err = generator.GenerateChecksums(inputFile, outputFile)
+	end := time.Now()
 
 	if err != nil {
 		fmt.Fprintf(
@@ -75,4 +84,23 @@ func Build(c *cli.Context) {
 		)
 		os.Exit(2)
 	}
+
+	inputFileInfo, err := os.Stat(filename)
+	if err != nil {
+		fmt.Fprintf(
+			os.Stderr,
+			"Error getting file info: %v\n",
+			filename,
+			err,
+		)
+		os.Exit(2)
+	}
+
+	fmt.Fprintf(
+		os.Stderr,
+		"Index for %v file generated in %v (%v bytes/S)",
+		inputFileInfo.Size(),
+		end.Sub(start),
+		float64(inputFileInfo.Size())/end.Sub(start).Seconds(),
+	)
 }

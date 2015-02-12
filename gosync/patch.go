@@ -2,12 +2,12 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/Redundancy/go-sync/blocksources"
 	"github.com/Redundancy/go-sync/chunks"
@@ -18,13 +18,15 @@ import (
 	"github.com/codegangsta/cli"
 )
 
+const USAGE = "gosync patch <localfile> <reference index> <reference source> [<output>]"
+
 func init() {
 	app.Commands = append(
 		app.Commands,
 		cli.Command{
 			Name:      "patch",
 			ShortName: "p",
-			Usage:     "gosync patch <localfile> <reference index> <reference source> [<output>]",
+			Usage:     USAGE,
 			Description: `Recreate the reference source file, using an index and a local file that is believed to be similar.
 The index should be produced by "gosync build". 
 
@@ -57,6 +59,14 @@ func Patch(c *cli.Context) {
 			os.Exit(1)
 		}
 	}()
+
+	switch len(c.Args()) {
+	case 3:
+	case 4:
+	default:
+		fmt.Fprintf(os.Stderr, "Usage is \"%v\" (invalid number of arguments)", USAGE)
+		return
+	}
 
 	local_filename := c.Args()[0]
 	gosync_arg := c.Args()[1]
@@ -134,11 +144,11 @@ func Patch(c *cli.Context) {
 		}
 	}()
 
-	// hello
-	err = binary.Read(indexReader, binary.LittleEndian, &blocksize)
+	_, _, _, blocksize, e := read_headers_and_check(indexReader, magic_string, major_version)
 
-	if err != nil {
-		return
+	if e != nil {
+		fmt.Printf("Error loading index: %v", e)
+		os.Exit(1)
 	}
 
 	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
@@ -201,13 +211,24 @@ func Patch(c *cli.Context) {
 
 	mergedBlocks := merger.GetMergedBlocks()
 	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
+	var source *blocksources.BlockSourceBase
+	resolver := blocksources.MakeNullFixedSizeResolver(uint64(blocksize))
 
-	// TODO: if source is a local file, use the reader block source
-	source := blocksources.NewHttpBlockSource(
-		reference_arg,
-		4,
-		blocksources.MakeNullFixedSizeResolver(uint64(blocksize)),
-	)
+	if strings.HasPrefix(reference_arg, "http://") || strings.HasPrefix(reference_arg, "https://") {
+		source = blocksources.NewHttpBlockSource(
+			reference_arg,
+			4,
+			resolver,
+		)
+	} else {
+		f, err := os.Open(reference_arg)
+
+		if err != nil {
+			return
+		}
+
+		source = blocksources.NewReadSeekerBlockSource(f, resolver)
+	}
 
 	err = sequential.SequentialPatcher(
 		local_file,

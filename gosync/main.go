@@ -17,6 +17,10 @@ import (
 
 const (
 	DEFAULT_BLOCK_SIZE = 8192
+	magic_string       = "G0S9NC" // just to confirm the file type is used correctly
+	major_version      = uint16(0)
+	minor_version      = uint16(1)
+	patch_version      = uint16(1)
 )
 
 var app *cli.App = cli.NewApp()
@@ -35,6 +39,13 @@ func main() {
 			Usage: "The number of streams to use concurrently",
 		},
 	}
+
+	app.Version = fmt.Sprintf(
+		"%v.%v.%v",
+		major_version,
+		minor_version,
+		patch_version,
+	)
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
