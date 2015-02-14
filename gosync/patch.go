@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,10 +9,6 @@ import (
 	"strings"
 
 	"github.com/Redundancy/go-sync/blocksources"
-	"github.com/Redundancy/go-sync/chunks"
-	"github.com/Redundancy/go-sync/comparer"
-	"github.com/Redundancy/go-sync/filechecksum"
-	sync_index "github.com/Redundancy/go-sync/index"
 	"github.com/Redundancy/go-sync/patcher/sequential"
 	"github.com/codegangsta/cli"
 )
@@ -49,6 +44,7 @@ The index should be produced by "gosync build".
 const MAX_PATCHING_BLOCK_STORAGE = 40
 
 func Patch(c *cli.Context) {
+	fmt.Fprintln(os.Stderr, "Starting patching process")
 	var err error = nil
 
 	// handle error cases and exit as the last thing we do
@@ -60,10 +56,7 @@ func Patch(c *cli.Context) {
 		}
 	}()
 
-	switch len(c.Args()) {
-	case 3:
-	case 4:
-	default:
+	if l := len(c.Args()); l < 3 || l > 4 {
 		fmt.Fprintf(os.Stderr, "Usage is \"%v\" (invalid number of arguments)", USAGE)
 		return
 	}
@@ -71,8 +64,8 @@ func Patch(c *cli.Context) {
 	local_filename := c.Args()[0]
 	gosync_arg := c.Args()[1]
 	reference_arg := c.Args()[2]
-	use_tempfile := len(c.Args()) == 4
 
+	var local_file_closed bool
 	local_file, err := os.Open(local_filename)
 
 	if err != nil {
@@ -81,54 +74,41 @@ func Patch(c *cli.Context) {
 	}
 
 	defer func() {
-		if e := local_file.Close(); err == nil {
+		if e := local_file.Close(); err == nil && !local_file_closed {
 			err = e
 		}
 	}()
 
 	var out_file *os.File = nil
 
-	if use_tempfile {
+	out_filename := local_filename
+	if len(c.Args()) == 4 {
+		out_filename = c.Args()[3]
+	}
+
+	fmt.Fprintln(os.Stderr, "Output file is", out_filename)
+
+	use_temp_file := false
+	if same, err := is_same_file(out_filename, local_filename); err != nil {
+		return
+	} else if same {
+		use_temp_file = true
+	}
+
+	temp_file_name := ""
+	if use_temp_file {
 		out_file, err = ioutil.TempFile(".", "tmp_")
-
-		defer func() {
-			if err == nil {
-				tempfilename := out_file.Name()
-				finalName := c.Args()[3]
-
-				if _, e := os.Stat(finalName); e != nil && !os.IsNotExist(e) {
-					err = e
-					return
-				} else if e == nil {
-					err = os.Remove(finalName)
-				}
-
-				if err == nil {
-					err = os.Rename(tempfilename, finalName)
-				}
-			}
-		}()
+		temp_file_name = out_file.Name()
+	} else if _, err := os.Stat(out_filename); os.IsNotExist(err) {
+		out_file, err = os.Create(out_filename)
 	} else {
-		out_file, err = os.Create(c.Args()[3])
-		out_filename := out_file.Name()
-
-		// Cleanup the temporary file after it is closed
-		defer func() {
-			if e := os.Remove(out_filename); err != nil {
-				err = e
-			}
-		}()
+		out_file, err = os.OpenFile(out_filename, os.O_WRONLY, 0)
+		out_file.Truncate(0)
 	}
 
 	if err != nil {
 		return
 	}
-
-	defer func() {
-		if e := out_file.Close(); err == nil {
-			err = e
-		}
-	}()
 
 	var blocksize uint32
 	indexReader, err := getLocalOrRemoteFile(gosync_arg)
@@ -138,32 +118,20 @@ func Patch(c *cli.Context) {
 		return
 	}
 
-	defer func() {
-		if e := indexReader.Close(); err == nil {
-			err = e
-		}
-	}()
-
 	_, _, _, blocksize, e := read_headers_and_check(indexReader, magic_string, major_version)
 
 	if e != nil {
+		indexReader.Close()
 		fmt.Printf("Error loading index: %v", e)
 		os.Exit(1)
 	}
 
-	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
-
-	readChunks, err := chunks.LoadChecksumsFromReader(
-		indexReader,
-		generator.WeakRollingHash.Size(),
-		generator.StrongHash.Size(),
-	)
+	index, err := read_index(indexReader, uint(blocksize))
+	indexReader.Close()
 
 	if err != nil {
 		return
 	}
-
-	index := sync_index.MakeChecksumIndex(readChunks)
 
 	fi, err := local_file.Stat()
 
@@ -180,37 +148,17 @@ func Patch(c *cli.Context) {
 		num_matchers = 1
 	}
 
-	// Note: Since not all sections of the file are equal in work
-	// it would be better to divide things up into more sections and
-	// pull work from a queue channel as each finish
-	sectionSize := local_file_size / num_matchers
-	sectionSize += int64(blocksize) - (sectionSize % int64(blocksize))
-	merger := &comparer.MatchMerger{}
-	compare := &comparer.Comparer{}
-
-	for i := int64(0); i < num_matchers; i++ {
-		offset := sectionSize * i
-
-		// Sections must overlap by blocksize (strictly blocksize - 1?)
-		if i > 0 {
-			offset -= int64(blocksize)
-		}
-
-		sectionReader := bufio.NewReaderSize(
-			io.NewSectionReader(local_file, offset, sectionSize),
-			MB,
-		)
-
-		sectionGenerator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
-
-		matchStream := compare.StartFindMatchingBlocks(
-			sectionReader, offset, sectionGenerator, index)
-
-		merger.StartMergeResultStream(matchStream, int64(blocksize))
-	}
+	merger, _ := multithreaded_matching(
+		local_file,
+		index,
+		local_file_size,
+		num_matchers,
+		uint(blocksize),
+	)
 
 	mergedBlocks := merger.GetMergedBlocks()
 	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
+
 	var source *blocksources.BlockSourceBase
 	resolver := blocksources.MakeNullFixedSizeResolver(uint64(blocksize))
 
@@ -227,6 +175,8 @@ func Patch(c *cli.Context) {
 			return
 		}
 
+		defer f.Close()
+
 		source = blocksources.NewReadSeekerBlockSource(f, resolver)
 	}
 
@@ -239,7 +189,35 @@ func Patch(c *cli.Context) {
 		out_file,
 	)
 
+	//out_file.Close()
+	local_file.Close()
+	local_file_closed = true
+
+	if use_temp_file {
+		// copy to local
+		lf, err := os.OpenFile(local_filename, os.O_WRONLY, 0)
+		if err != nil {
+			return
+		}
+
+		lf.Truncate(0)
+
+		defer func() { err = lf.Close() }()
+
+		out_file.Seek(0, 0)
+		_, err = io.Copy(lf, out_file)
+
+		if err != nil {
+			return
+		}
+	}
+
+	err = out_file.Close()
+
+	if use_temp_file {
+		os.Remove(temp_file_name)
+	}
+
 	fmt.Printf("Downloaded %v bytes\n", source.ReadBytes())
 	fmt.Printf("Total file is %v bytes\n", int64(index.BlockCount)*int64(blocksize))
-
 }

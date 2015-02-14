@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/comparer"
+	"github.com/Redundancy/go-sync/filechecksum"
+	"github.com/Redundancy/go-sync/index"
 	"github.com/Redundancy/go-sync/patcher"
 	"io"
 	"net/http"
@@ -64,7 +68,14 @@ func handleFileError(filename string, err error) {
 }
 
 func getLocalOrRemoteFile(path string) (io.ReadCloser, error) {
-	if _, err := url.Parse(path); err == nil {
+	url, err := url.Parse(path)
+
+	switch {
+	case err != nil:
+		return os.Open(path)
+	case url.Scheme == "":
+		return os.Open(path)
+	default:
 		response, err := http.Get(path)
 
 		if err != nil {
@@ -76,8 +87,6 @@ func getLocalOrRemoteFile(path string) (io.ReadCloser, error) {
 		}
 
 		return response.Body, nil
-	} else {
-		return os.Open(path)
 	}
 }
 
@@ -151,4 +160,87 @@ func read_headers_and_check(r io.Reader, magic string, required_major_version ui
 
 	err = binary.Read(r, binary.LittleEndian, &blocksize)
 	return
+}
+
+func read_index(r io.Reader, blocksize uint) (i *index.ChecksumIndex, err error) {
+	generator := filechecksum.NewFileChecksumGenerator(blocksize)
+
+	readChunks, e := chunks.LoadChecksumsFromReader(
+		r,
+		generator.WeakRollingHash.Size(),
+		generator.StrongHash.Size(),
+	)
+
+	err = e
+
+	if err != nil {
+		return
+	}
+
+	i = index.MakeChecksumIndex(readChunks)
+
+	return
+}
+
+func multithreaded_matching(
+	local_file *os.File,
+	idx *index.ChecksumIndex,
+	local_file_size,
+	num_matchers int64,
+	blocksize uint,
+) (*comparer.MatchMerger, *comparer.Comparer) {
+	// Note: Since not all sections of the file are equal in work
+	// it would be better to divide things up into more sections and
+	// pull work from a queue channel as each finish
+	sectionSize := local_file_size / num_matchers
+	sectionSize += int64(blocksize) - (sectionSize % int64(blocksize))
+	merger := &comparer.MatchMerger{}
+	compare := &comparer.Comparer{}
+
+	for i := int64(0); i < num_matchers; i++ {
+		offset := sectionSize * i
+
+		// Sections must overlap by blocksize (strictly blocksize - 1?)
+		if i > 0 {
+			offset -= int64(blocksize)
+		}
+
+		sectionReader := bufio.NewReaderSize(
+			io.NewSectionReader(local_file, offset, sectionSize),
+			MB,
+		)
+
+		sectionGenerator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
+
+		matchStream := compare.StartFindMatchingBlocks(
+			sectionReader, offset, sectionGenerator, idx)
+
+		merger.StartMergeResultStream(matchStream, int64(blocksize))
+	}
+
+	return merger, compare
+}
+
+// better way to do this?
+func is_same_file(path1, path2 string) (same bool, err error) {
+
+	fi1, err := os.Stat(path1)
+
+	switch {
+	case os.IsNotExist(err):
+		return false, nil
+	case err != nil:
+		return
+	}
+
+	fi2, err := os.Stat(path2)
+
+	switch {
+	case os.IsNotExist(err):
+		return false, nil
+	case err != nil:
+		return
+	}
+
+	return os.SameFile(fi1, fi2), nil
 }

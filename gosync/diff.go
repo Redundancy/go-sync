@@ -1,18 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
+	"github.com/codegangsta/cli"
 	"os"
 	"runtime"
 	"time"
-
-	"github.com/Redundancy/go-sync/chunks"
-	"github.com/Redundancy/go-sync/comparer"
-	"github.com/Redundancy/go-sync/filechecksum"
-	sync_index "github.com/Redundancy/go-sync/index"
-	"github.com/codegangsta/cli"
 )
 
 func init() {
@@ -65,20 +58,14 @@ func Diff(c *cli.Context) {
 	}
 
 	fmt.Println("Blocksize: ", blocksize)
-	generator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
 
-	readChunks, err := chunks.LoadChecksumsFromReader(
-		reference_file,
-		generator.WeakRollingHash.Size(),
-		generator.StrongHash.Size(),
-	)
+	index, err := read_index(reference_file, uint(blocksize))
+	reference_file.Close()
 
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 
-	index := sync_index.MakeChecksumIndex(readChunks)
 	fmt.Println("Weak hash count:", index.WeakCount())
 
 	fi, err := local_file.Stat()
@@ -97,32 +84,13 @@ func Diff(c *cli.Context) {
 		num_matchers = 1
 	}
 
-	sectionSize := local_file_size / num_matchers
-	sectionSize += int64(blocksize) - (sectionSize % int64(blocksize))
-	merger := &comparer.MatchMerger{}
-	compare := &comparer.Comparer{}
-	fmt.Printf("Using %v cores\n", num_matchers)
-
-	for i := int64(0); i < num_matchers; i++ {
-		offset := sectionSize * i
-
-		// Sections must overlap by blocksize
-		if i > 0 {
-			offset -= int64(blocksize)
-		}
-
-		sectionReader := bufio.NewReaderSize(
-			io.NewSectionReader(local_file, offset, sectionSize),
-			MB,
-		)
-
-		sectionGenerator := filechecksum.NewFileChecksumGenerator(uint(blocksize))
-
-		matchStream := compare.StartFindMatchingBlocks(
-			sectionReader, offset, sectionGenerator, index)
-
-		merger.StartMergeResultStream(matchStream, int64(blocksize))
-	}
+	merger, compare := multithreaded_matching(
+		local_file,
+		index,
+		local_file_size,
+		num_matchers,
+		uint(blocksize),
+	)
 
 	mergedBlocks := merger.GetMergedBlocks()
 
@@ -131,7 +99,6 @@ func Diff(c *cli.Context) {
 	matchedBlockCountAfterMerging := uint(0)
 
 	for _, b := range mergedBlocks {
-		//fmt.Printf("%#v\n", b)
 		totalMatchingSize += uint64(b.EndBlock-b.StartBlock+1) * uint64(blocksize)
 		matchedBlockCountAfterMerging += b.EndBlock - b.StartBlock + 1
 	}
