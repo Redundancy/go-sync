@@ -91,23 +91,23 @@ type asyncResult struct {
 	err          error
 }
 
-type queuedRequest struct {
-	startBlockID uint
-	endBlockID   uint
+type QueuedRequest struct {
+	StartBlockID uint
+	EndBlockID   uint
 }
 
-type queuedRequestList []queuedRequest
+type QueuedRequestList []QueuedRequest
 
-func (r queuedRequestList) Len() int {
+func (r QueuedRequestList) Len() int {
 	return len(r)
 }
 
-func (r queuedRequestList) Swap(i, j int) {
+func (r QueuedRequestList) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
-func (r queuedRequestList) Less(i, j int) bool {
-	return r[i].startBlockID < r[j].startBlockID
+func (r QueuedRequestList) Less(i, j int) bool {
+	return r[i].StartBlockID < r[j].StartBlockID
 }
 
 func MakeNullFixedSizeResolver(blockSize uint64) BlockSourceOffsetResolver {

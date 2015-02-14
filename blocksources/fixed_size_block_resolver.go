@@ -10,16 +10,18 @@ func (r *FixedSizeBlockResolver) GetBlockStartOffset(blockID uint) int64 {
 }
 
 func (r *FixedSizeBlockResolver) GetBlockEndOffset(blockID uint) int64 {
+	// TODO: should really take into account the maximum size of the file and potential partial blocks at the end
 	return int64(uint64(blockID+1) * r.BlockSize)
 }
 
-func (r *FixedSizeBlockResolver) SplitBlockRangeToDesiredSize(startBlockID, endBlockID uint) []queuedRequest {
+// Split blocks into chunks of the desired size, or less. This implementation assumes a fixed block size at the source.
+func (r *FixedSizeBlockResolver) SplitBlockRangeToDesiredSize(startBlockID, endBlockID uint) []QueuedRequest {
 
 	if r.MaxDesiredRequestSize == 0 {
-		return []queuedRequest{
-			queuedRequest{
-				startBlockID: startBlockID,
-				endBlockID:   endBlockID,
+		return []QueuedRequest{
+			QueuedRequest{
+				StartBlockID: startBlockID,
+				EndBlockID:   endBlockID,
 			},
 		}
 	}
@@ -32,7 +34,7 @@ func (r *FixedSizeBlockResolver) SplitBlockRangeToDesiredSize(startBlockID, endB
 	// how many blocks is the desired size?
 	blockCountPerRequest := uint(maxSize / r.BlockSize)
 
-	requests := make([]queuedRequest, 0, (endBlockID-startBlockID)/blockCountPerRequest+1)
+	requests := make([]QueuedRequest, 0, (endBlockID-startBlockID)/blockCountPerRequest+1)
 	currentBlockID := startBlockID
 
 	for {
@@ -41,9 +43,9 @@ func (r *FixedSizeBlockResolver) SplitBlockRangeToDesiredSize(startBlockID, endB
 		if maxEndBlock > endBlockID {
 			requests = append(
 				requests,
-				queuedRequest{
-					startBlockID: currentBlockID,
-					endBlockID:   endBlockID,
+				QueuedRequest{
+					StartBlockID: currentBlockID,
+					EndBlockID:   endBlockID,
 				},
 			)
 
@@ -51,9 +53,9 @@ func (r *FixedSizeBlockResolver) SplitBlockRangeToDesiredSize(startBlockID, endB
 		} else {
 			requests = append(
 				requests,
-				queuedRequest{
-					startBlockID: currentBlockID,
-					endBlockID:   maxEndBlock - 1,
+				QueuedRequest{
+					StartBlockID: currentBlockID,
+					EndBlockID:   maxEndBlock - 1,
 				},
 			)
 

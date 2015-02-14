@@ -25,7 +25,7 @@ type BlockSourceRequester interface {
 type BlockSourceOffsetResolver interface {
 	GetBlockStartOffset(blockID uint) int64
 	GetBlockEndOffset(blockID uint) int64
-	SplitBlockRangeToDesiredSize(startBlockID, endBlockID uint) []queuedRequest
+	SplitBlockRangeToDesiredSize(startBlockID, endBlockID uint) []QueuedRequest
 }
 
 func NewBlockSourceBase(
@@ -123,7 +123,7 @@ func (s *BlockSourceBase) loop() {
 	resultChan := make(chan asyncResult)
 	defer close(resultChan)
 
-	requestQueue := make(queuedRequestList, 0, s.ConcurrentRequests*2)
+	requestQueue := make(QueuedRequestList, 0, s.ConcurrentRequests*2)
 
 	// enable us to order responses for the active requests, lowest to highest
 	requestOrdering := make(UintSlice, 0, s.ConcurrentRequests)
@@ -137,17 +137,17 @@ func (s *BlockSourceBase) loop() {
 
 			nextRequest := requestQueue[len(requestQueue)-1]
 
-			requestOrdering = append(requestOrdering, nextRequest.startBlockID)
+			requestOrdering = append(requestOrdering, nextRequest.StartBlockID)
 			sort.Sort(sort.Reverse(requestOrdering))
 			go func() {
 				result, err := s.Requester.DoRequest(
-					s.BlockSourceResolver.GetBlockStartOffset(nextRequest.startBlockID),
-					s.BlockSourceResolver.GetBlockEndOffset(nextRequest.endBlockID),
+					s.BlockSourceResolver.GetBlockStartOffset(nextRequest.StartBlockID),
+					s.BlockSourceResolver.GetBlockEndOffset(nextRequest.EndBlockID),
 				)
 
 				resultChan <- asyncResult{
-					startBlockID: nextRequest.startBlockID,
-					endBlockID:   nextRequest.endBlockID,
+					startBlockID: nextRequest.StartBlockID,
+					endBlockID:   nextRequest.EndBlockID,
 					data:         result,
 					err:          err,
 				}
