@@ -19,8 +19,8 @@ const (
 	DEFAULT_BLOCK_SIZE = 8192
 	magic_string       = "G0S9NC" // just to confirm the file type is used correctly
 	major_version      = uint16(0)
-	minor_version      = uint16(1)
-	patch_version      = uint16(2)
+	minor_version      = uint16(2)
+	patch_version      = uint16(0)
 )
 
 var app *cli.App = cli.NewApp()

@@ -61,7 +61,7 @@ func SequentialPatcher(
 			blockSizeToRead := int64(firstMatched.EndBlock-firstMatched.StartBlock+1) * firstMatched.BlockSize
 
 			if _, err := io.Copy(output, io.LimitReader(localFile, blockSizeToRead)); err != nil {
-				return err
+				return fmt.Errorf("Could not copy %v bytes to output: %v", blockSizeToRead, err)
 			}
 
 			currentBlock = firstMatched.EndBlock + 1
@@ -75,25 +75,45 @@ func SequentialPatcher(
 			case result := <-reference.GetResultChannel():
 				if result.StartBlock == currentBlock {
 					if _, err := output.Write(result.Data); err != nil {
-						return err
+						return fmt.Errorf(
+							"Could not write data to output: %v", 
+							err,
+						)
 					} else {
-						currentBlock += calculateNumberOfCompletedBlocks(
+
+						completed := calculateNumberOfCompletedBlocks(
 							len(result.Data),
 							firstMissing.BlockSize,
 						)
 
+						if completed != (firstMissing.EndBlock-firstMissing.StartBlock) + 1 {
+							return fmt.Errorf(
+								"Unexpected reponse length from remote source: blocks %v-%v (got %v blocks)", 
+								firstMissing.StartBlock,
+								firstMissing.EndBlock,
+								completed,
+						)
+						}
+
+						currentBlock += completed
 						requiredRemoteBlocks = requiredRemoteBlocks[1:]
 					}
 				} else {
-					return fmt.Errorf("Received unexpected block: %v", result.StartBlock)
+					return fmt.Errorf(
+						"Received unexpected block: %v", 
+						result.StartBlock,
+					)
 				}
 			case err := <-reference.EncounteredError():
-				return err
+				return fmt.Errorf(
+					"Failed to read from reference file: %v", 
+					err,
+				)
 			}
 
 		} else {
 			return fmt.Errorf(
-				"Could not find block in missing or matched list: %v - %v %v",
+				"Could not find block in missing or matched list: %v\nRemote: %v\nLocal: %v\n",
 				currentBlock,
 				requiredRemoteBlocks,
 				locallyAvailableBlocks,

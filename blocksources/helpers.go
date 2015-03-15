@@ -115,3 +115,10 @@ func MakeNullFixedSizeResolver(blockSize uint64) BlockSourceOffsetResolver {
 		BlockSize: blockSize,
 	}
 }
+
+func MakeFileSizedBlockResolver(blockSize uint64, filesize int64) BlockSourceOffsetResolver {
+	return &FixedSizeBlockResolver{
+		BlockSize: blockSize,
+		FileSize:  filesize,
+	}
+}

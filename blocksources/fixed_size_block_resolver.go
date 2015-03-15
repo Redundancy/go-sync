@@ -2,16 +2,24 @@ package blocksources
 
 type FixedSizeBlockResolver struct {
 	BlockSize             uint64
+	FileSize              int64
 	MaxDesiredRequestSize uint64
 }
 
 func (r *FixedSizeBlockResolver) GetBlockStartOffset(blockID uint) int64 {
-	return int64(uint64(blockID) * r.BlockSize)
+	if off := int64(uint64(blockID) * r.BlockSize); r.FileSize != 0 && off > r.FileSize {
+		return r.FileSize
+	} else {
+		return off
+	}
 }
 
 func (r *FixedSizeBlockResolver) GetBlockEndOffset(blockID uint) int64 {
-	// TODO: should really take into account the maximum size of the file and potential partial blocks at the end
-	return int64(uint64(blockID+1) * r.BlockSize)
+	if off := int64(uint64(blockID+1) * r.BlockSize); r.FileSize != 0 && off > r.FileSize {
+		return r.FileSize
+	} else {
+		return off
+	}
 }
 
 // Split blocks into chunks of the desired size, or less. This implementation assumes a fixed block size at the source.

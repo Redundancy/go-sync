@@ -46,6 +46,10 @@ func Build(c *cli.Context) {
 		os.Exit(1)
 	}
 
+	s, _ := inputFile.Stat()
+	// TODO: Error?
+	file_size := s.Size()
+
 	defer inputFile.Close()
 
 	ext := filepath.Ext(filename)
@@ -59,7 +63,13 @@ func Build(c *cli.Context) {
 
 	defer outputFile.Close()
 
-	if err = write_headers(outputFile, magic_string, blocksize, []uint16{major_version, minor_version, patch_version}); err != nil {
+	if err = write_headers(
+		outputFile,
+		magic_string,
+		blocksize,
+		file_size,
+		[]uint16{major_version, minor_version, patch_version},
+	); err != nil {
 		fmt.Fprintf(
 			os.Stderr,
 			"Error getting file info: %v\n",
@@ -69,8 +79,6 @@ func Build(c *cli.Context) {
 		os.Exit(2)
 	}
 
-	// TODO: write the blocksize first
-	//outputFile.Write(binary.LittleEndian.)
 	start := time.Now()
 	_, err = generator.GenerateChecksums(inputFile, outputFile)
 	end := time.Now()
@@ -98,7 +106,7 @@ func Build(c *cli.Context) {
 
 	fmt.Fprintf(
 		os.Stderr,
-		"Index for %v file generated in %v (%v bytes/S)",
+		"Index for %v file generated in %v (%v bytes/S)\n",
 		inputFileInfo.Size(),
 		end.Sub(start),
 		float64(inputFileInfo.Size())/end.Sub(start).Seconds(),

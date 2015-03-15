@@ -99,11 +99,13 @@ func Patch(c *cli.Context) {
 	if use_temp_file {
 		out_file, err = ioutil.TempFile(".", "tmp_")
 		temp_file_name = out_file.Name()
+		fmt.Printf("Using temporary file: %v\n", temp_file_name)
 	} else if _, err := os.Stat(out_filename); os.IsNotExist(err) {
 		out_file, err = os.Create(out_filename)
+		fmt.Printf("Creating file: %v\n", out_filename)
 	} else {
 		out_file, err = os.OpenFile(out_filename, os.O_WRONLY, 0)
-		out_file.Truncate(0)
+		fmt.Printf("Using existing file: %v\n", out_filename)
 	}
 
 	if err != nil {
@@ -118,7 +120,7 @@ func Patch(c *cli.Context) {
 		return
 	}
 
-	_, _, _, blocksize, e := read_headers_and_check(indexReader, magic_string, major_version)
+	_, _, _, filesize, blocksize, e := read_headers_and_check(indexReader, magic_string, major_version)
 
 	if e != nil {
 		indexReader.Close()
@@ -160,7 +162,10 @@ func Patch(c *cli.Context) {
 	missing := mergedBlocks.GetMissingBlocks(uint(index.BlockCount) - 1)
 
 	var source *blocksources.BlockSourceBase
-	resolver := blocksources.MakeNullFixedSizeResolver(uint64(blocksize))
+	resolver := blocksources.MakeFileSizedBlockResolver(
+		uint64(blocksize),
+		filesize,
+	)
 
 	if strings.HasPrefix(reference_arg, "http://") || strings.HasPrefix(reference_arg, "https://") {
 		source = blocksources.NewHttpBlockSource(
@@ -188,6 +193,7 @@ func Patch(c *cli.Context) {
 		MAX_PATCHING_BLOCK_STORAGE,
 		out_file,
 	); err != nil {
+		err = fmt.Errorf("Error patching to out_file: %v", err)
 		return
 	}
 
@@ -205,8 +211,6 @@ func Patch(c *cli.Context) {
 			return
 		}
 
-		lf.Truncate(0)
-
 		defer func() {
 			e := lf.Close()
 			if err == nil {
@@ -214,15 +218,21 @@ func Patch(c *cli.Context) {
 			}
 		}()
 
+		//current, _ := out_file.Seek(1, 0)
+		//out_file.Truncate(current)
+		//lf.Truncate(current)
+
 		out_file.Seek(0, 0)
 		_, err = io.Copy(lf, out_file)
 
 		if err != nil {
+			err = fmt.Errorf("Error copying to local file: %v", err)
 			return
 		}
 	}
 
 	if err = out_file.Close(); err != nil {
+		err = fmt.Errorf("Error closing out_file: %v", err)
 		return
 	}
 

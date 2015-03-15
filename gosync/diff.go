@@ -50,7 +50,7 @@ func Diff(c *cli.Context) {
 
 	defer reference_file.Close()
 
-	_, _, _, blocksize, e := read_headers_and_check(reference_file, magic_string, major_version)
+	_, _, _, _, blocksize, e := read_headers_and_check(reference_file, magic_string, major_version)
 
 	if e != nil {
 		fmt.Printf("Error loading index: %v", e)

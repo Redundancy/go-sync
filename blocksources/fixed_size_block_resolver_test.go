@@ -27,6 +27,7 @@ func TestFixedSizeResolverSplitsBlocksOfDesiredSize(t *testing.T) {
 	res := &FixedSizeBlockResolver{
 		BlockSize:             5,
 		MaxDesiredRequestSize: 5,
+		FileSize:              20000,
 	}
 
 	// Should split two blocks, each of the desired request size
@@ -56,6 +57,7 @@ func TestThatMultipleBlocksAreSplitByRoundingDown(t *testing.T) {
 	res := &FixedSizeBlockResolver{
 		BlockSize:             5,
 		MaxDesiredRequestSize: 12,
+		FileSize:              20000,
 	}
 
 	// 0,1 (10) - 2-3 (10)
@@ -84,6 +86,7 @@ func TestThatADesiredSizeSmallerThanABlockResultsInSingleBlocks(t *testing.T) {
 	res := &FixedSizeBlockResolver{
 		BlockSize:             5,
 		MaxDesiredRequestSize: 4,
+		FileSize:              20000,
 	}
 
 	// Should split two blocks
@@ -105,5 +108,20 @@ func TestThatADesiredSizeSmallerThanABlockResultsInSingleBlocks(t *testing.T) {
 	}
 	if result[1].EndBlockID != 1 {
 		t.Errorf("Unexpected end blockID: %v", result[1])
+	}
+}
+
+func TestThatFileSizeTruncatesBlockEnds(t *testing.T) {
+	res := &FixedSizeBlockResolver{
+		BlockSize:             5,
+		MaxDesiredRequestSize: 100,
+		FileSize:              13,
+	}
+
+	// Should split two blocks
+	result := res.GetBlockEndOffset(3)
+
+	if result != 13 {
+		t.Errorf("Unexpected BlockEnd Offset:", result)
 	}
 }

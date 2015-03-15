@@ -154,7 +154,7 @@ func TestHttpBlockSourcePartialContentRequest(t *testing.T) {
 	b := NewHttpBlockSource(
 		LOCAL_URL+"/partial",
 		2,
-		MakeNullFixedSizeResolver(4),
+		MakeFileSizedBlockResolver(4, int64(len(PARTIAL_CONTENT))),
 	)
 
 	b.RequestBlocks(patcher.MissingBlockSpan{
