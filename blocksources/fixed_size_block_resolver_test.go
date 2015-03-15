@@ -14,11 +14,11 @@ func TestNullResolverGivesBackTheSameBlocks(t *testing.T) {
 
 	r := result[0]
 
-	if r.startBlockID != 0 {
+	if r.StartBlockID != 0 {
 		t.Errorf("Unexpected start block ID: %v", r)
 	}
 
-	if r.endBlockID != 10000 {
+	if r.EndBlockID != 10000 {
 		t.Errorf("Unexpected end block ID: %v", r)
 	}
 }
@@ -37,17 +37,17 @@ func TestFixedSizeResolverSplitsBlocksOfDesiredSize(t *testing.T) {
 		t.Fatalf("Unexpected result length (expected 2): %v", result)
 	}
 
-	if result[0].startBlockID != 0 {
+	if result[0].StartBlockID != 0 {
 		t.Errorf("Unexpected start blockID: %v", result[0])
 	}
-	if result[0].endBlockID != 0 {
+	if result[0].EndBlockID != 0 {
 		t.Errorf("Unexpected end blockID: %v", result[0])
 	}
 
-	if result[1].startBlockID != 1 {
+	if result[1].StartBlockID != 1 {
 		t.Errorf("Unexpected start blockID: %v", result[1])
 	}
-	if result[1].endBlockID != 1 {
+	if result[1].EndBlockID != 1 {
 		t.Errorf("Unexpected end blockID: %v", result[1])
 	}
 }
@@ -65,17 +65,17 @@ func TestThatMultipleBlocksAreSplitByRoundingDown(t *testing.T) {
 		t.Fatalf("Unexpected result length (expected 2): %v", result)
 	}
 
-	if result[0].startBlockID != 0 {
+	if result[0].StartBlockID != 0 {
 		t.Errorf("Unexpected start blockID: %v", result[0])
 	}
-	if result[0].endBlockID != 1 {
+	if result[0].EndBlockID != 1 {
 		t.Errorf("Unexpected end blockID: %v", result[0])
 	}
 
-	if result[1].startBlockID != 2 {
+	if result[1].StartBlockID != 2 {
 		t.Errorf("Unexpected start blockID: %v", result[1])
 	}
-	if result[1].endBlockID != 3 {
+	if result[1].EndBlockID != 3 {
 		t.Errorf("Unexpected end blockID: %v", result[1])
 	}
 }
@@ -93,17 +93,17 @@ func TestThatADesiredSizeSmallerThanABlockResultsInSingleBlocks(t *testing.T) {
 		t.Fatalf("Unexpected result length (expected 2): %v", result)
 	}
 
-	if result[0].startBlockID != 0 {
+	if result[0].StartBlockID != 0 {
 		t.Errorf("Unexpected start blockID: %v", result[0])
 	}
-	if result[0].endBlockID != 0 {
+	if result[0].EndBlockID != 0 {
 		t.Errorf("Unexpected end blockID: %v", result[0])
 	}
 
-	if result[1].startBlockID != 1 {
+	if result[1].StartBlockID != 1 {
 		t.Errorf("Unexpected start blockID: %v", result[1])
 	}
-	if result[1].endBlockID != 1 {
+	if result[1].EndBlockID != 1 {
 		t.Errorf("Unexpected end blockID: %v", result[1])
 	}
 }
