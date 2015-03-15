@@ -20,7 +20,7 @@ const (
 	magic_string       = "G0S9NC" // just to confirm the file type is used correctly
 	major_version      = uint16(0)
 	minor_version      = uint16(1)
-	patch_version      = uint16(1)
+	patch_version      = uint16(2)
 )
 
 var app *cli.App = cli.NewApp()

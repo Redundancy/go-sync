@@ -180,17 +180,22 @@ func Patch(c *cli.Context) {
 		source = blocksources.NewReadSeekerBlockSource(f, resolver)
 	}
 
-	err = sequential.SequentialPatcher(
+	if err = sequential.SequentialPatcher(
 		local_file,
 		source,
 		toPatcherMissingSpan(missing, int64(blocksize)),
 		toPatcherFoundSpan(mergedBlocks, int64(blocksize)),
 		MAX_PATCHING_BLOCK_STORAGE,
 		out_file,
-	)
+	); err != nil {
+		return
+	}
 
 	//out_file.Close()
-	local_file.Close()
+	if err = local_file.Close(); err != nil {
+		return
+	}
+
 	local_file_closed = true
 
 	if use_temp_file {
@@ -202,7 +207,12 @@ func Patch(c *cli.Context) {
 
 		lf.Truncate(0)
 
-		defer func() { err = lf.Close() }()
+		defer func() {
+			e := lf.Close()
+			if err == nil {
+				err = e
+			}
+		}()
 
 		out_file.Seek(0, 0)
 		_, err = io.Copy(lf, out_file)
@@ -212,12 +222,14 @@ func Patch(c *cli.Context) {
 		}
 	}
 
-	err = out_file.Close()
+	if err = out_file.Close(); err != nil {
+		return
+	}
 
 	if use_temp_file {
 		os.Remove(temp_file_name)
 	}
 
 	fmt.Printf("Downloaded %v bytes\n", source.ReadBytes())
-	fmt.Printf("Total file is %v bytes\n", int64(index.BlockCount)*int64(blocksize))
+	//fmt.Printf("Total file is %v bytes\n", int64(index.BlockCount)*int64(blocksize))
 }
