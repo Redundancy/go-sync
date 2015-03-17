@@ -59,7 +59,7 @@ func Diff(c *cli.Context) {
 
 	fmt.Println("Blocksize: ", blocksize)
 
-	index, err := read_index(reference_file, uint(blocksize))
+	index, _, err := read_index(reference_file, uint(blocksize))
 	reference_file.Close()
 
 	if err != nil {

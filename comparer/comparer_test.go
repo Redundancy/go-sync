@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/indexbuilder"
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func CheckResults(
@@ -73,7 +73,7 @@ func compare(
 	originalFileContent := bytes.NewBufferString(original)
 	generator := filechecksum.NewFileChecksumGenerator(block_size)
 
-	_, reference, err := indexbuilder.BuildChecksumIndex(
+	_, reference, _, err := indexbuilder.BuildChecksumIndex(
 		generator,
 		originalFileContent,
 	)
@@ -97,7 +97,7 @@ func compare(
 // Splits successive strings into blocks of size n
 // 2, ABCD -> AB, CD
 // 2, ABCD, E, FG -> AB, CD, E, FG
-func split( n int, ss... string) (result []string) {
+func split(n int, ss ...string) (result []string) {
 	totalLength := 0
 	for _, s := range ss {
 		totalLength += len(s)/n + 1
@@ -106,7 +106,7 @@ func split( n int, ss... string) (result []string) {
 
 	for _, x := range ss {
 		i := int(0)
-		for i + n < len(x) {
+		for i+n < len(x) {
 			result = append(
 				result,
 				x[i:i+n],
@@ -115,7 +115,7 @@ func split( n int, ss... string) (result []string) {
 			i += n
 		}
 
-		if i < len(x) - 1 {
+		if i < len(x)-1 {
 			result = append(
 				result,
 				x[i:],
@@ -131,7 +131,6 @@ func TestSplit(t *testing.T) {
 	EXPECTED := []string{"ab", "cd", "ef"}
 	result := split(2, INPUT)
 
-
 	if !reflect.DeepEqual(result, EXPECTED) {
 		t.Errorf(
 			"Lists differ: %v vs %v",
@@ -146,7 +145,6 @@ func TestSplitWithPartial(t *testing.T) {
 	EXPECTED := []string{"abcd", "ef"}
 	result := split(4, INPUT)
 
-
 	if !reflect.DeepEqual(result, EXPECTED) {
 		t.Errorf(
 			"Lists differ: %v vs %v",
@@ -157,10 +155,9 @@ func TestSplitWithPartial(t *testing.T) {
 }
 
 func TestMultiSplit(t *testing.T) {
-	INPUT := []string{ "abcdef", "ghij"}
+	INPUT := []string{"abcdef", "ghij"}
 	EXPECTED := []string{"abcd", "ef", "ghij"}
 	result := split(4, INPUT...)
-
 
 	if !reflect.DeepEqual(result, EXPECTED) {
 		t.Errorf(

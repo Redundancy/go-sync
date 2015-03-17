@@ -22,6 +22,7 @@ func NewReadSeekerBlockSource(
 			rs: r,
 		},
 		resolver,
+		nil, // TODO: No verifier!
 		1,
 		8*MB,
 	)

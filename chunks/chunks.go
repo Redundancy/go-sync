@@ -77,3 +77,10 @@ func LoadChecksumsFromReader(
 
 	return result, nil
 }
+
+// satisfies filechecksum.ChecksumLookup
+type StrongChecksumGetter []ChunkChecksum
+
+func (s StrongChecksumGetter) Get(blockID int) []byte {
+	return s[blockID].StrongChecksum
+}

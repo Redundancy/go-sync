@@ -21,6 +21,7 @@ import (
 func BuildChecksumIndex(check *filechecksum.FileChecksumGenerator, r io.Reader) (
 	fcheck []byte,
 	i *index.ChecksumIndex,
+	lookup filechecksum.ChecksumLookup,
 	err error,
 ) {
 	b := bytes.NewBuffer(nil)
@@ -39,6 +40,7 @@ func BuildChecksumIndex(check *filechecksum.FileChecksumGenerator, r io.Reader) 
 	}
 
 	i = index.MakeChecksumIndex(readChunks)
+	lookup = chunks.StrongChecksumGetter(readChunks)
 
 	return
 }
@@ -46,6 +48,7 @@ func BuildChecksumIndex(check *filechecksum.FileChecksumGenerator, r io.Reader) 
 func BuildIndexFromString(generator *filechecksum.FileChecksumGenerator, reference string) (
 	fileCheckSum []byte,
 	referenceIndex *index.ChecksumIndex,
+	lookup filechecksum.ChecksumLookup,
 	err error,
 ) {
 	return BuildChecksumIndex(generator, bytes.NewBufferString(reference))

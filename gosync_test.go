@@ -82,7 +82,7 @@ func Example() {
 
 	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
 
-	_, referenceFileIndex, err := indexbuilder.BuildIndexFromString(generator, REFERENCE)
+	_, referenceFileIndex, _, err := indexbuilder.BuildIndexFromString(generator, REFERENCE)
 
 	if err != nil {
 		return
@@ -113,6 +113,8 @@ func Example() {
 	PrintReferenceSpans("Missing", missingBlockRanges, REFERENCE, BLOCK_SIZE)
 
 	// the "file" to write to
+	// No verification on the source of the replacement data.
+	// See http example for hash checking in a block source.
 	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
 	remoteReferenceSource := blocksources.NewReadSeekerBlockSource(
 		bytes.NewReader([]byte(REFERENCE)),
@@ -162,7 +164,7 @@ func BenchmarkIndexComparisons(b *testing.B) {
 
 	file := readers.NewSizedNonRepeatingSequence(6, SIZE)
 	generator := filechecksum.NewFileChecksumGenerator(8 * KB)
-	_, index, err := indexbuilder.BuildChecksumIndex(generator, file)
+	_, index, _, err := indexbuilder.BuildChecksumIndex(generator, file)
 
 	if err != nil {
 		b.Fatal(err)

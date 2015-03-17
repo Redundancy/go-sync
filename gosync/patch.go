@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
+	"github.com/Redundancy/go-sync/filechecksum"
 	"io"
 	"io/ioutil"
 	"os"
@@ -128,7 +130,7 @@ func Patch(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	index, err := read_index(indexReader, uint(blocksize))
+	index, checksumLookup, err := read_index(indexReader, uint(blocksize))
 	indexReader.Close()
 
 	if err != nil {
@@ -172,6 +174,11 @@ func Patch(c *cli.Context) {
 			reference_arg,
 			4,
 			resolver,
+			&filechecksum.HashVerifier{
+				Hash:                md5.New(),
+				BlockSize:           uint(blocksize),
+				BlockChecksumGetter: checksumLookup,
+			},
 		)
 	} else {
 		f, err := os.Open(reference_arg)

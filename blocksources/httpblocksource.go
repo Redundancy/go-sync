@@ -1,10 +1,10 @@
 package blocksources
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
-	"bytes"
 	"strings"
 )
 
@@ -22,6 +22,7 @@ func NewHttpBlockSource(
 	url string,
 	concurrentRequests int,
 	resolver BlockSourceOffsetResolver,
+	verifier BlockVerifier,
 ) *BlockSourceBase {
 	return NewBlockSourceBase(
 		&HttpRequester{
@@ -29,6 +30,7 @@ func NewHttpBlockSource(
 			client: http.DefaultClient,
 		},
 		resolver,
+		verifier,
 		concurrentRequests,
 		4*MB,
 	)
@@ -89,7 +91,7 @@ func (r *HttpRequester) DoRequest(startOffset int64, endOffset int64) (data []by
 			err = fmt.Errorf(
 				"Unexpected response length %v (%v): %v",
 				r.url,
-				endOffset- startOffset+1,
+				endOffset-startOffset+1,
 				len(data),
 			)
 		}

@@ -2,6 +2,7 @@ package gosync
 
 import (
 	"bytes"
+	"crypto/md5"
 	"fmt"
 	"github.com/Redundancy/go-sync/blocksources"
 	"github.com/Redundancy/go-sync/comparer"
@@ -57,7 +58,7 @@ func Example_httpBlockSource() {
 	setupServer()
 
 	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
-	_, referenceFileIndex, err := indexbuilder.BuildIndexFromString(generator, REFERENCE)
+	_, referenceFileIndex, checksumLookup, err := indexbuilder.BuildIndexFromString(generator, REFERENCE)
 
 	if err != nil {
 		return
@@ -86,6 +87,11 @@ func Example_httpBlockSource() {
 		LOCAL_URL+"/content",
 		2,
 		blocksources.MakeNullFixedSizeResolver(BLOCK_SIZE),
+		&filechecksum.HashVerifier{
+			Hash:                md5.New(),
+			BlockSize:           BLOCK_SIZE,
+			BlockChecksumGetter: checksumLookup,
+		},
 	)
 
 	err = sequential.SequentialPatcher(
@@ -98,6 +104,7 @@ func Example_httpBlockSource() {
 	)
 
 	if err != nil {
+		fmt.Println("Error:", err)
 		return
 	}
 

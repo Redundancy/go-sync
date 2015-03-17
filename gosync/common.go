@@ -171,7 +171,7 @@ func read_headers_and_check(r io.Reader, magic string, required_major_version ui
 	return
 }
 
-func read_index(r io.Reader, blocksize uint) (i *index.ChecksumIndex, err error) {
+func read_index(r io.Reader, blocksize uint) (i *index.ChecksumIndex, checksumLookup filechecksum.ChecksumLookup, err error) {
 	generator := filechecksum.NewFileChecksumGenerator(blocksize)
 
 	readChunks, e := chunks.LoadChecksumsFromReader(
@@ -186,6 +186,7 @@ func read_index(r io.Reader, blocksize uint) (i *index.ChecksumIndex, err error)
 		return
 	}
 
+	checksumLookup = chunks.StrongChecksumGetter(readChunks)
 	i = index.MakeChecksumIndex(readChunks)
 
 	return

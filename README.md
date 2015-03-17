@@ -58,6 +58,7 @@ Index generation:
 - [ ] Clean up naming consistency and clarity: Block / Chunk etc
 - [ ] Flesh out full directory build / sync
 - [ ] Implement 'patch' payloads from a known start point to a desired endstate
+- [x] Validate downloaded blocks
 - [ ] Validate full file checksum after patching
 - [ ] Provide bandwidth limiting / monitoring as part of http blocksource
 - [ ] Think about turning the filechecksum into an interface

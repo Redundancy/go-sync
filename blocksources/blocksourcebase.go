@@ -1,6 +1,7 @@
 package blocksources
 
 import (
+	"fmt"
 	"github.com/Redundancy/go-sync/patcher"
 	"sort"
 )
@@ -28,9 +29,15 @@ type BlockSourceOffsetResolver interface {
 	SplitBlockRangeToDesiredSize(startBlockID, endBlockID uint) []QueuedRequest
 }
 
+// Checks blocks against their expected checksum
+type BlockVerifier interface {
+	VerifyBlockRange(startBlockID uint, data []byte) bool
+}
+
 func NewBlockSourceBase(
 	requester BlockSourceRequester,
 	resolver BlockSourceOffsetResolver,
+	verifier BlockVerifier,
 	concurrentRequestCount int,
 	concurrentBytes int64,
 ) *BlockSourceBase {
@@ -38,6 +45,7 @@ func NewBlockSourceBase(
 	b := &BlockSourceBase{
 		Requester:           requester,
 		BlockSourceResolver: resolver,
+		Verifier:            verifier,
 		ConcurrentRequests:  concurrentRequestCount,
 		ConcurrentBytes:     concurrentBytes,
 		exitChannel:         make(chan bool),
@@ -59,6 +67,7 @@ func NewBlockSourceBase(
 type BlockSourceBase struct {
 	Requester           BlockSourceRequester
 	BlockSourceResolver BlockSourceOffsetResolver
+	Verifier            BlockVerifier
 
 	// The number of requests that BlockSourceBase may service at once
 	ConcurrentRequests int
@@ -180,7 +189,18 @@ func (s *BlockSourceBase) loop() {
 			}
 
 			s.bytesRequested += int64(len(result.data))
-			// TODO: Confirm checksum
+
+			if s.Verifier != nil && !s.Verifier.VerifyBlockRange(result.startBlockID, result.data) {
+				pendingErrors.setError(
+					fmt.Errorf(
+						"The returned block range (%v-%v) did not match the expected checksum for the blocks",
+						result.startBlockID, result.endBlockID,
+					),
+				)
+				pendingResponse.clear()
+				state = STATE_EXITING
+				break
+			}
 
 			responseOrdering = append(responseOrdering,
 				patcher.BlockReponse{

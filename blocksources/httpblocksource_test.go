@@ -2,7 +2,9 @@ package blocksources
 
 import (
 	"bytes"
+	"crypto/md5"
 	"fmt"
+	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/patcher"
 	"net/http"
 	"testing"
@@ -26,12 +28,20 @@ func partialContentHandler(w http.ResponseWriter, req *http.Request) {
 	http.ServeContent(w, req, "", time.Now(), partialContent)
 }
 
+var CORRUPT_CONTENT = []byte("sfdfsfhhrtertert sffsfsdfsdfsdf")
+var corruptContent = bytes.NewReader(CORRUPT_CONTENT)
+
+func corruptContentHandler(w http.ResponseWriter, req *http.Request) {
+	http.ServeContent(w, req, "", time.Now(), corruptContent)
+}
+
 // set up a http server locally that will respond predictably to ranged requests
 // NB: Doing this will prevent deadlocks from being caught!
 func init() {
 	s := http.NewServeMux()
 	s.HandleFunc("/", handler)
 	s.HandleFunc("/partial", partialContentHandler)
+	s.HandleFunc("/corrupt", corruptContentHandler)
 	s.Handle("/404", http.NotFoundHandler())
 
 	go func() {
@@ -69,6 +79,7 @@ func TestHttpBlockSource(t *testing.T) {
 		LOCAL_URL+"/",
 		2,
 		MakeNullFixedSizeResolver(4),
+		nil,
 	)
 
 	err := b.RequestBlocks(patcher.MissingBlockSpan{
@@ -100,6 +111,7 @@ func TestHttpBlockSource404(t *testing.T) {
 		LOCAL_URL+"/404",
 		2,
 		MakeNullFixedSizeResolver(4),
+		nil,
 	)
 
 	b.RequestBlocks(patcher.MissingBlockSpan{
@@ -129,6 +141,7 @@ func TestHttpBlockSourceOffsetBlockRequest(t *testing.T) {
 		LOCAL_URL+"/",
 		2,
 		MakeNullFixedSizeResolver(4),
+		nil,
 	)
 
 	b.RequestBlocks(patcher.MissingBlockSpan{
@@ -155,6 +168,7 @@ func TestHttpBlockSourcePartialContentRequest(t *testing.T) {
 		LOCAL_URL+"/partial",
 		2,
 		MakeFileSizedBlockResolver(4, int64(len(PARTIAL_CONTENT))),
+		nil,
 	)
 
 	b.RequestBlocks(patcher.MissingBlockSpan{
@@ -185,6 +199,44 @@ func TestHttpBlockSourcePartialContentRequest(t *testing.T) {
 		}
 	case err := <-b.EncounteredError():
 		t.Fatal(err)
+	case <-time.After(time.Second):
+		t.Fatalf("Timeout waiting for result")
+	}
+}
+
+type SingleBlockSource []byte
+
+func (d SingleBlockSource) Get(blockID int) []byte {
+	m := md5.New()
+	return m.Sum(d)
+}
+
+func TestHttpBlockSourceVerification(t *testing.T) {
+	const BLOCK_SIZE = 4
+
+	b := NewHttpBlockSource(
+		LOCAL_URL+"/corrupt",
+		2,
+		MakeNullFixedSizeResolver(BLOCK_SIZE),
+		&filechecksum.HashVerifier{
+			Hash:                md5.New(),
+			BlockSize:           BLOCK_SIZE,
+			BlockChecksumGetter: SingleBlockSource(TEST_CONTENT[0:BLOCK_SIZE]),
+		},
+	)
+
+	b.RequestBlocks(patcher.MissingBlockSpan{
+		BlockSize:  BLOCK_SIZE,
+		StartBlock: 0,
+		EndBlock:   0,
+	})
+
+	select {
+	case result := <-b.GetResultChannel():
+		t.Fatalf("Should have thrown an error, got %v", result)
+	case e := <-b.EncounteredError():
+		t.Logf("Encountered expected error: %v", e)
+		return
 	case <-time.After(time.Second):
 		t.Fatalf("Timeout waiting for result")
 	}

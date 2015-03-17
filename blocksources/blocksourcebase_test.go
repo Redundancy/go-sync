@@ -54,7 +54,7 @@ func TestRangeSlice(t *testing.T) {
 }
 
 func TestCreateAndCloseBlockSourceBase(t *testing.T) {
-	b := NewBlockSourceBase(nil, nil, 1, 1024)
+	b := NewBlockSourceBase(nil, nil, nil, 1, 1024)
 	b.Close()
 
 	// TODO: Race condition here. Can Close() block?
@@ -84,6 +84,7 @@ func TestBlockSourceBaseError(t *testing.T) {
 	b := NewBlockSourceBase(
 		&erroringRequester{},
 		MakeNullFixedSizeResolver(4),
+		nil,
 		1,
 		1024,
 	)
@@ -111,6 +112,7 @@ func TestBlockSourceRequest(t *testing.T) {
 			return expected, nil
 		}),
 		MakeNullFixedSizeResolver(4),
+		nil,
 		1,
 		1024,
 	)
@@ -140,6 +142,7 @@ func TestConcurrentBlockRequests(t *testing.T) {
 			return content[start:end], nil
 		}),
 		MakeNullFixedSizeResolver(2),
+		nil,
 		2,
 		1024,
 	)
@@ -187,6 +190,7 @@ func TestOutOfOrderRequestCompletion(t *testing.T) {
 			return content[start:end], nil
 		}),
 		MakeNullFixedSizeResolver(1),
+		nil,
 		2,
 		1024,
 	)
@@ -250,6 +254,7 @@ func TestRequestCountLimiting(t *testing.T) {
 			return []byte{0, 0}, nil
 		}),
 		MakeNullFixedSizeResolver(1),
+		nil,
 		MAX_CONCURRENCY,
 		1024,
 	)
