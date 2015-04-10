@@ -6,7 +6,7 @@ do
 	sh $f
 
 	rc=$?
-	if [ $rc != 0 ] then
+	if [ $rc != 0 ]; then
 		exit $rc
 	fi
 done
