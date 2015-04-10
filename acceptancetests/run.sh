@@ -1,6 +1,6 @@
 for f in $TRAVIS_BUILD_DIR/*test.sh
 do
-	["$f" == "$TRAVIS_BUILD_DIR/*test.sh"] && continue
+	[! -f "$f"] && continue
 
 	echo "Running acceptance test $f"
 done
