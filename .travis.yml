@@ -9,4 +9,5 @@ script:
   - go test -v github.com/Redundancy/go-sync/...
   - echo -e 'travis_fold:end:UnitTest'
   - echo -e 'travis_fold:start:AcceptanceTest'
+  - sh src/github.com/Redundancy/go-sync/acceptancetests/run.sh
   - echo -e 'travis_fold:end:AcceptanceTest'
