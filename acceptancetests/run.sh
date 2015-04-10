@@ -1,9 +1,7 @@
-DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-
-shopt -s nullglob
-
-for f in $DIR/*test.sh
+for f in $TRAVIS_BUILD_DIR/*test.sh
 do
+	["$f" -eq "$TRAVIS_BUILD_DIR/*test.sh"] && continue
+
 	echo "Running acceptance test $f"
 done
 
