@@ -31,7 +31,15 @@ type FourByteBlockSource []byte
 
 func (d FourByteBlockSource) Get(blockID int) []byte {
 	m := md5.New()
-	m.Write(d[blockID*4 : (blockID+1)*4])
+
+	start := blockID * 4
+	end := start + 4
+
+	if end >= len(d) {
+		end = len(d)
+	}
+
+	m.Write(d[start:end])
 	return m.Sum(nil)
 }
 
@@ -42,6 +50,20 @@ func TestSplitBlocksEqualThemselves(t *testing.T) {
 		Hash:                md5.New(),
 		BlockSize:           uint(4),
 		BlockChecksumGetter: FourByteBlockSource(data),
+	}
+
+	if !h.VerifyBlockRange(0, data) {
+		t.Error("data did not verify")
+	}
+}
+
+func TestPartialBlock(t *testing.T) {
+	data := []byte("fo")
+
+	h := HashVerifier{
+		Hash:                md5.New(),
+		BlockSize:           uint(4),
+		BlockChecksumGetter: SingleBlockSource(data),
 	}
 
 	if !h.VerifyBlockRange(0, data) {

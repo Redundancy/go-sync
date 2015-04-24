@@ -21,7 +21,7 @@ func (v *HashVerifier) VerifyBlockRange(startBlockID uint, data []byte) bool {
 		end := start + int(v.BlockSize)
 
 		if end > len(data) {
-			end = len(data) - 1
+			end = len(data)
 		}
 
 		blockData := data[start:end]
