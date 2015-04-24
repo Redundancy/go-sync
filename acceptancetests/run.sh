@@ -3,9 +3,9 @@ do
 	[ ! -f "$f" ] && continue
 
 	echo "Running acceptance test $f"
-	echo 'travis_fold:start:$f'
+	echo 'travis_fold:start:test_output'
 	sh $f
-	echo 'travis_fold:end:$f'
+	echo 'travis_fold:end:test_output'
 	rc=$?
 
 	if [ $rc != 0 ]; then
