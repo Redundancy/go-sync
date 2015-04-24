@@ -1,6 +1,7 @@
 package blocksources
 
 import (
+	"errors"
 	"fmt"
 	"github.com/Redundancy/go-sync/patcher"
 	"sort"
@@ -108,11 +109,22 @@ func (s *BlockSourceBase) EncounteredError() <-chan error {
 	return s.errorChannel
 }
 
-func (s *BlockSourceBase) Close() {
-	// TODO: race condition
+var BlockSourceAlreadyClosedError = errors.New("Block source was already closed")
+
+func (s *BlockSourceBase) Close() (err error) {
+	// if it has already been closed, just recover
+	// however, let the caller know
+	defer func() {
+		if recover() != nil {
+			err = BlockSourceAlreadyClosedError
+		}
+	}()
+
 	if !s.hasQuit {
 		s.exitChannel <- true
 	}
+
+	return
 }
 
 func (s *BlockSourceBase) loop() {
