@@ -294,7 +294,7 @@ func TestRequestCountLimiting(t *testing.T) {
 	close(counter)
 	close(waiter)
 
-	if max != MAX_CONCURRENCY {
+	if max > MAX_CONCURRENCY {
 		t.Errorf("Maximum requests in flight was greater than the requested concurrency: %v", max)
 	}
 	if call_counter != REQUESTS {
