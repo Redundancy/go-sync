@@ -17,7 +17,14 @@ type HashVerifier struct {
 
 func (v *HashVerifier) VerifyBlockRange(startBlockID uint, data []byte) bool {
 	for i := 0; i*int(v.BlockSize) < len(data); i++ {
-		blockData := data[i*int(v.BlockSize) : (i+1)*int(v.BlockSize)]
+		start := i * int(v.BlockSize)
+		end := start + int(v.BlockSize)
+
+		if end > len(data) {
+			end = len(data) - 1
+		}
+
+		blockData := data[start:end]
 
 		expectedChecksum := v.BlockChecksumGetter.Get(int(startBlockID) + i)
 		if expectedChecksum == nil {
