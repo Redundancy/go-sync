@@ -225,9 +225,9 @@ func Patch(c *cli.Context) {
 			}
 		}()
 
-		//current, _ := out_file.Seek(1, 0)
-		//out_file.Truncate(current)
-		//lf.Truncate(current)
+		current, _ := out_file.Seek(1, 0)
+		out_file.Truncate(current)
+		lf.Truncate(current)
 
 		out_file.Seek(0, 0)
 		_, err = io.Copy(lf, out_file)
