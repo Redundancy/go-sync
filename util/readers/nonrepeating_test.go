@@ -16,7 +16,7 @@ func TestNonRepeatingSequenceReader(t *testing.T) {
 	i.Read(b)
 
 	if a[0] == b[0] {
-		t.Fatal("Bytes should not be the same! %s vs %s", a, b)
+		t.Fatalf("Bytes should not be the same! %s vs %s", a, b)
 	}
 }
 
