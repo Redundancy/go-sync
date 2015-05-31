@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/Redundancy/go-sync/blocksources"
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/indexbuilder"
+	"github.com/Redundancy/go-sync/patcher"
 	"github.com/Redundancy/go-sync/patcher/sequential"
-	"net/http"
-	"time"
 )
 
 // due to short example strings, use a very small block size
@@ -47,7 +49,7 @@ func setupServer() {
 			)
 
 			if err != nil {
-				PORT += 1
+				PORT++
 			}
 		}
 	}()
@@ -114,4 +116,29 @@ func Example_httpBlockSource() {
 	// Output:
 	// Patched content: "The quick brown fox jumped over the lazy dog"
 	// Downloaded Bytes: 16
+}
+
+func ToPatcherFoundSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.FoundBlockSpan {
+	result := make([]patcher.FoundBlockSpan, len(sl))
+
+	for i, v := range sl {
+		result[i].StartBlock = v.StartBlock
+		result[i].EndBlock = v.EndBlock
+		result[i].MatchOffset = v.ComparisonStartOffset
+		result[i].BlockSize = blockSize
+	}
+
+	return result
+}
+
+func ToPatcherMissingSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.MissingBlockSpan {
+	result := make([]patcher.MissingBlockSpan, len(sl))
+
+	for i, v := range sl {
+		result[i].StartBlock = v.StartBlock
+		result[i].EndBlock = v.EndBlock
+		result[i].BlockSize = blockSize
+	}
+
+	return result
 }

@@ -81,6 +81,6 @@ func LoadChecksumsFromReader(
 // satisfies filechecksum.ChecksumLookup
 type StrongChecksumGetter []ChunkChecksum
 
-func (s StrongChecksumGetter) Get(blockID int) []byte {
+func (s StrongChecksumGetter) GetStrongChecksumForBlock(blockID int) []byte {
 	return s[blockID].StrongChecksum
 }

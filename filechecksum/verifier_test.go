@@ -7,7 +7,7 @@ import (
 
 type SingleBlockSource []byte
 
-func (d SingleBlockSource) Get(blockID int) []byte {
+func (d SingleBlockSource) GetStrongChecksumForBlock(blockID int) []byte {
 	m := md5.New()
 	m.Write(d)
 	return m.Sum(nil)
@@ -29,7 +29,7 @@ func TestBlockEqualsItself(t *testing.T) {
 
 type FourByteBlockSource []byte
 
-func (d FourByteBlockSource) Get(blockID int) []byte {
+func (d FourByteBlockSource) GetStrongChecksumForBlock(blockID int) []byte {
 	m := md5.New()
 
 	start := blockID * 4

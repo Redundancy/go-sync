@@ -21,7 +21,7 @@ func init() {
 			Flags: []cli.Flag{
 				cli.IntFlag{
 					Name:  "blocksize",
-					Value: DEFAULT_BLOCK_SIZE,
+					Value: DefaultBlockSize,
 					Usage: "The block size to use for the gosync file",
 				},
 			},
@@ -63,12 +63,12 @@ func Build(c *cli.Context) {
 
 	defer outputFile.Close()
 
-	if err = write_headers(
+	if err = writeHeaders(
 		outputFile,
-		magic_string,
+		magicString,
 		blocksize,
 		file_size,
-		[]uint16{major_version, minor_version, patch_version},
+		[]uint16{majorVersion, minorVersion, patchVersion},
 	); err != nil {
 		fmt.Fprintf(
 			os.Stderr,

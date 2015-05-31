@@ -6,7 +6,7 @@ import (
 )
 
 type ChecksumLookup interface {
-	Get(blockID int) []byte
+	GetStrongChecksumForBlock(blockID int) []byte
 }
 
 type HashVerifier struct {
@@ -26,7 +26,10 @@ func (v *HashVerifier) VerifyBlockRange(startBlockID uint, data []byte) bool {
 
 		blockData := data[start:end]
 
-		expectedChecksum := v.BlockChecksumGetter.Get(int(startBlockID) + i)
+		expectedChecksum := v.BlockChecksumGetter.GetStrongChecksumForBlock(
+			int(startBlockID) + i,
+		)
+
 		if expectedChecksum == nil {
 			return true
 		}

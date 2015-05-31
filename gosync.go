@@ -1,5 +1,5 @@
 /*
-gosync is inspired by zsync, and rsync. It aims to take the fundamentals and create a very flexible library that can be adapted
+Package gosync is inspired by zsync, and rsync. It aims to take the fundamentals and create a very flexible library that can be adapted
 to work in many ways.
 
 We rely heavily on built in Go abstractions like io.Reader, hash.Hash and our own interfaces - this makes the code easier to change, and to test.

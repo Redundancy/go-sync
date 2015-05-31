@@ -16,14 +16,14 @@ import (
 )
 
 const (
-	DEFAULT_BLOCK_SIZE = 8192
-	magic_string       = "G0S9NC" // just to confirm the file type is used correctly
-	major_version      = uint16(0)
-	minor_version      = uint16(2)
-	patch_version      = uint16(1)
+	DefaultBlockSize = 8192
+	magicString      = "G0S9NC" // just to confirm the file type is used correctly
+	majorVersion     = uint16(0)
+	minorVersion     = uint16(2)
+	patchVersion     = uint16(1)
 )
 
-var app *cli.App = cli.NewApp()
+var app = cli.NewApp()
 
 func main() {
 	app.Name = "gosync"
@@ -42,9 +42,9 @@ func main() {
 
 	app.Version = fmt.Sprintf(
 		"%v.%v.%v",
-		major_version,
-		minor_version,
-		patch_version,
+		majorVersion,
+		minorVersion,
+		patchVersion,
 	)
 
 	runtime.GOMAXPROCS(runtime.NumCPU())

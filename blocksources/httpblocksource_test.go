@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
-	"github.com/Redundancy/go-sync/filechecksum"
-	"github.com/Redundancy/go-sync/patcher"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/Redundancy/go-sync/filechecksum"
+	"github.com/Redundancy/go-sync/patcher"
 )
 
 var PORT = 8000
@@ -206,7 +207,7 @@ func TestHttpBlockSourcePartialContentRequest(t *testing.T) {
 
 type SingleBlockSource []byte
 
-func (d SingleBlockSource) Get(blockID int) []byte {
+func (d SingleBlockSource) GetStrongChecksumForBlock(blockID int) []byte {
 	m := md5.New()
 	return m.Sum(d)
 }

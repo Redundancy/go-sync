@@ -5,21 +5,65 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+
 	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/comparer"
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/index"
 	"github.com/Redundancy/go-sync/patcher"
-	"io"
-	"net/http"
-	"net/url"
-	"os"
+	"github.com/codegangsta/cli"
 )
 
 const (
+	// KB - One Kilobyte
 	KB = 1024
-	MB = 1024 * KB
+	// MB - One Megabyte
+	MB = 1000000
 )
+
+// FileSummary implements the FileSummary interface
+type FileSummary struct {
+	blockSize  uint
+	blockCount uint
+	fileSize   int64
+	*index.ChecksumIndex
+	filechecksum.ChecksumLookup
+}
+
+// Blocksize of the file
+func (fs *FileSummary) Blocksize() uint {
+	return fs.blockSize
+}
+
+// BlockCount of the file
+func (fs *FileSummary) BlockCount() uint {
+	return fs.blockCount
+}
+
+// Filesize of the file
+func (fs *FileSummary) Filesize() int64 {
+	return fs.fileSize
+}
+
+func errorWrapper(c *cli.Context, f func(*cli.Context) error) {
+	defer func() {
+		if p := recover(); p != nil {
+			fmt.Fprintln(os.Stderr, p)
+			os.Exit(1)
+		}
+	}()
+
+	if err := f(c); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
+	return
+}
 
 func openFileAndHandleError(filename string) (f *os.File) {
 	var err error
@@ -115,8 +159,14 @@ func toPatcherMissingSpan(sl comparer.BlockSpanList, blockSize int64) []patcher.
 	return result
 }
 
-func write_headers(f *os.File, magic string, blocksize uint32, filesize int64, versions []uint16) (err error) {
-	if _, err = f.WriteString(magic_string); err != nil {
+func writeHeaders(
+	f *os.File,
+	magic string,
+	blocksize uint32,
+	filesize int64,
+	versions []uint16,
+) (err error) {
+	if _, err = f.WriteString(magicString); err != nil {
 		return
 	}
 
@@ -135,13 +185,24 @@ func write_headers(f *os.File, magic string, blocksize uint32, filesize int64, v
 }
 
 // reads the file headers and checks the magic string, then the semantic versioning
-func read_headers_and_check(r io.Reader, magic string, required_major_version uint16) (major, minor, patch uint16, filesize int64, blocksize uint32, err error) {
-	b := make([]byte, len(magic_string))
+func readHeadersAndCheck(
+	r io.Reader,
+	magic string,
+	requiredMajorVersion uint16,
+) (
+	major, minor, patch uint16,
+	filesize int64,
+	blocksize uint32,
+	err error,
+) {
+	b := make([]byte, len(magicString))
 
 	if _, err = r.Read(b); err != nil {
 		return
-	} else if string(b) != magic_string {
-		err = errors.New("file header does not match magic string. Not a valid gosync file.")
+	} else if string(b) != magicString {
+		err = errors.New(
+			"file header does not match magic string. Not a valid gosync file",
+		)
 		return
 	}
 
@@ -152,11 +213,11 @@ func read_headers_and_check(r io.Reader, magic string, required_major_version ui
 		}
 	}
 
-	if required_major_version != major {
+	if requiredMajorVersion != major {
 		err = fmt.Errorf(
 			"The major version of the gosync file (%v.%v.%v) does not match the tool (%v.%v.%v).",
 			major, minor, patch,
-			major_version, minor_version, patch_version,
+			majorVersion, minorVersion, patchVersion,
 		)
 
 		return
@@ -171,7 +232,12 @@ func read_headers_and_check(r io.Reader, magic string, required_major_version ui
 	return
 }
 
-func read_index(r io.Reader, blocksize uint) (i *index.ChecksumIndex, checksumLookup filechecksum.ChecksumLookup, err error) {
+func readIndex(r io.Reader, blocksize uint) (
+	i *index.ChecksumIndex,
+	checksumLookup filechecksum.ChecksumLookup,
+	blockCount uint,
+	err error,
+) {
 	generator := filechecksum.NewFileChecksumGenerator(blocksize)
 
 	readChunks, e := chunks.LoadChecksumsFromReader(
@@ -188,26 +254,27 @@ func read_index(r io.Reader, blocksize uint) (i *index.ChecksumIndex, checksumLo
 
 	checksumLookup = chunks.StrongChecksumGetter(readChunks)
 	i = index.MakeChecksumIndex(readChunks)
+	blockCount = uint(len(readChunks))
 
 	return
 }
 
-func multithreaded_matching(
-	local_file *os.File,
+func multithreadedMatching(
+	localFile *os.File,
 	idx *index.ChecksumIndex,
-	local_file_size,
-	num_matchers int64,
+	localFileSize,
+	matcherCount int64,
 	blocksize uint,
 ) (*comparer.MatchMerger, *comparer.Comparer) {
 	// Note: Since not all sections of the file are equal in work
 	// it would be better to divide things up into more sections and
 	// pull work from a queue channel as each finish
-	sectionSize := local_file_size / num_matchers
+	sectionSize := localFileSize / matcherCount
 	sectionSize += int64(blocksize) - (sectionSize % int64(blocksize))
 	merger := &comparer.MatchMerger{}
 	compare := &comparer.Comparer{}
 
-	for i := int64(0); i < num_matchers; i++ {
+	for i := int64(0); i < matcherCount; i++ {
 		offset := sectionSize * i
 
 		// Sections must overlap by blocksize (strictly blocksize - 1?)
@@ -216,7 +283,7 @@ func multithreaded_matching(
 		}
 
 		sectionReader := bufio.NewReaderSize(
-			io.NewSectionReader(local_file, offset, sectionSize),
+			io.NewSectionReader(localFile, offset, sectionSize),
 			MB,
 		)
 
@@ -232,25 +299,3 @@ func multithreaded_matching(
 }
 
 // better way to do this?
-func is_same_file(path1, path2 string) (same bool, err error) {
-
-	fi1, err := os.Stat(path1)
-
-	switch {
-	case os.IsNotExist(err):
-		return false, nil
-	case err != nil:
-		return
-	}
-
-	fi2, err := os.Stat(path2)
-
-	switch {
-	case os.IsNotExist(err):
-		return false, nil
-	case err != nil:
-		return
-	}
-
-	return os.SameFile(fi1, fi2), nil
-}

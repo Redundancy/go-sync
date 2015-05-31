@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/codegangsta/cli"
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/codegangsta/cli"
 )
 
 func init() {
@@ -29,28 +30,32 @@ func init() {
 }
 
 func Diff(c *cli.Context) {
-	local_filename := c.Args()[0]
-	reference_filename := c.Args()[1]
-	start_time := time.Now()
+	localFilename := c.Args()[0]
+	referenceFilename := c.Args()[1]
+	startTime := time.Now()
 
-	local_file := openFileAndHandleError(local_filename)
+	localFile := openFileAndHandleError(localFilename)
 
-	if local_file == nil {
+	if localFile == nil {
 		os.Exit(1)
 	}
 
-	defer local_file.Close()
+	defer localFile.Close()
 
 	var blocksize uint32
-	reference_file := openFileAndHandleError(reference_filename)
+	referenceFile := openFileAndHandleError(referenceFilename)
 
-	if reference_file == nil {
+	if referenceFile == nil {
 		os.Exit(1)
 	}
 
-	defer reference_file.Close()
+	defer referenceFile.Close()
 
-	_, _, _, _, blocksize, e := read_headers_and_check(reference_file, magic_string, major_version)
+	_, _, _, _, blocksize, e := readHeadersAndCheck(
+		referenceFile,
+		magicString,
+		majorVersion,
+	)
 
 	if e != nil {
 		fmt.Printf("Error loading index: %v", e)
@@ -59,8 +64,8 @@ func Diff(c *cli.Context) {
 
 	fmt.Println("Blocksize: ", blocksize)
 
-	index, _, err := read_index(reference_file, uint(blocksize))
-	reference_file.Close()
+	index, _, _, err := readIndex(referenceFile, uint(blocksize))
+	referenceFile.Close()
 
 	if err != nil {
 		return
@@ -68,7 +73,7 @@ func Diff(c *cli.Context) {
 
 	fmt.Println("Weak hash count:", index.WeakCount())
 
-	fi, err := local_file.Stat()
+	fi, err := localFile.Stat()
 
 	if err != nil {
 		fmt.Println("Could not get info on file:", err)
@@ -77,17 +82,17 @@ func Diff(c *cli.Context) {
 
 	num_matchers := int64(c.Int("p"))
 
-	local_file_size := fi.Size()
+	localFile_size := fi.Size()
 
 	// Don't split up small files
-	if local_file_size < 1024*1024 {
+	if localFile_size < 1024*1024 {
 		num_matchers = 1
 	}
 
-	merger, compare := multithreaded_matching(
-		local_file,
+	merger, compare := multithreadedMatching(
+		localFile,
 		index,
-		local_file_size,
+		localFile_size,
 		num_matchers,
 		uint(blocksize),
 	)
@@ -136,5 +141,5 @@ func Diff(c *cli.Context) {
 	}
 
 	fmt.Println("Approximate missing bytes:", totalMissingSize)
-	fmt.Println("Time taken:", time.Now().Sub(start_time))
+	fmt.Println("Time taken:", time.Now().Sub(startTime))
 }
