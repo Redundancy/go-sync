@@ -3,73 +3,109 @@ Go-Sync
 [![Build Status](https://travis-ci.org/Redundancy/go-sync.svg?branch=master)](https://travis-ci.org/Redundancy/go-sync)
 [![GoDoc](https://godoc.org/github.com/Redundancy/go-sync?status.svg)](https://godoc.org/github.com/Redundancy/go-sync)
 
-gosync is a library inspired by zsync and rsync. The intent is that it's easier to build upon than the zsync/rsync codebases. By writing it in Go, it's easier to create in a way that's cross-platform, can take advantage of multiple CPUs with built in benchmarks, code documentation and unit tests.
+gosync is a library inspired by zsync and rsync.
+Here are the goals:
 
-There are many areas that benefit from the use of multiple threads & connections:
-* Making use of multiple http connections, to avoid the bandwidth latency product limiting transfer rates to remote servers
-* Making use of multiple CPUs while doing the comparisons
+### Fast
+Using the concurrency and performance features of Golang, Go-sync is designed to take advantage of multiple processors and multiple HTTP connections to make the most of modern hardware and minimize the impact of the bandwidth latency product.
 
-gosync includes a commandline tool that's intended as a starting point for building the functionality that you want.
+### Cross Platform
+Works on Windows and Linux, without cygwin or fuss.
 
-Zsync modified rsync to allow it to be used against a "dumb" http server, but we can go further:
-* Arrange files by hashed path, and checksum: if a file hasn't changed, you can serve the existing version (NB: this works well with s3 sync)
-* Split the checksum blocks from the data: serve checksum blocks securely over https, while allowing caching on the data over http
-* Split up the data files: improve the fallback when there's a non HTTP 1.1 proxy between the client and server
+### Easy
 
-### Current State
+A new high-level interface designed to reduce the work of implementing block transfer in your application:
+```golang
+fs := &BasicSummary{...}
 
-The command-line tools are fleshed out enough for testing comparison behaviour and profiling it against real input files. 
-***NB: The command-line tools are not in a state for use in production!***
+rsync, err := MakeRSync(
+    localFilename,
+    referencePath,
+    outFilename,
+    fs,
+)
 
-There is a basic HTTP Blocksource, which currently supports fixed size blocks (no compression on the source), but which should be able to multiple tcp connections to increase transfer speed where latency is a bottleneck.
+if err != nil {
+    return err
+}
 
-Work needs to be done to add support for a BlockSourceResolver that can deal with compressed blocks.
-Some changes and refactoring need to happen where there are assumptions about a source block being of 'blocksize' - in order
-to optimize transmitted size, blocks should be gziped. Being able to support multiple source files would also be good.
+err = rsync.Patch()
 
-After that, there needs to be some cleanup of the CLI command code, which is pretty verbose and duplicates a lot. Things like version numbers in the files would be good, and then implementation of more features to make it potentially usable.
+if err != nil {
+    return err
+}
 
-### Performance
-On an 8 MB file with few matches, I'm hitting about 16 MB/s with 4 threads. I think that we're mostly CPU bound, and should scale reasonably well with more processors.
-When there are very similar files, the speed is far higher (since the weak checksum match is significantly cheaper)
+return rsync.Close()
+```
 
-#### Some numbers:
-Budget for 8 MB/s byte by byte comparison on single thread: 120ns
+### Extensible
+All functionality is based on interfaces, allowing customization of behavior:
 
-Current Benchmark State (Golang 1.4):
-- Checksum: 50.3 ns
-- Comparison (No index lookup)
-  - Weak Rejection: 68.6 ns
-  - Strong Rejection: 326 ns
+```golang
+// Here, the input version is a local string
+inputFile := bytes.NewReader(localVersionAsBytes)
 
-Generating a gosync file for a 22 GB file (not on an SSD) took me around 2m31s ~= 145 MB/s sustained checksum generation.
-The resulting file was around 50 MB and does not compress well (which makes sense, since it's hashes with a hopefully near-random distribution).
+// And the output is a buffer
+patchedFile := bytes.NewBuffer(nil)
 
-The 32 bit Rollsum hash produces far fewer false positives than the 16 bit one, with the same 4 byte hash overhead.
+// This information is meta-data on the file that should be loaded / provided
+// You can also provide your own implementation of the FileSummary interface
+summary := &BasicSummary{
+    ChecksumIndex:  referenceFileIndex,
+    // Disable verification of hashes for downloaded data (not really a good idea!)
+    ChecksumLookup: nil,
+    BlockCount:     uint(blockCount),
+    BlockSize:      blockSize,
+    FileSize:       int64(len(referenceAsBytes)),
+}
 
-Index generation:
-- Easily hits 100 MB/s on my workstation, satisfying the idea that you should be able to build 12 GB payloads in ~1m
-- More likely to be bottlenecked by the disk throughput / seek time than the CPU
+rsync := &RSync{
+    Input:  inputFile,
+    Output: patchedFile,
+    // An in-memory block source
+    Source: blocksources.NewReadSeekerBlockSource(
+        bytes.NewReader(referenceAsBytes),
+        blocksources.MakeNullFixedSizeResolver(uint64(blockSize)),
+    ),
+    Index:   summary,
+    Summary: summary,
+    OnClose: nil,
+}
+```
+
+Reuse low level objects to build a new high level library, or implement a new lower-level object to add a new transfer protocol (for example).
+
+### Tested
+GoSync has been built from the ground up with unit tests.
+The GoSync command-line tool has acceptance tests, although not everything is covered.
+
+## Current State
+Go-Sync is still probably not ready for production.
+
+The most obvious areas that still need improvement are the acceptance tests, the error messages,
+compression on the blocks that are retrieved from the source and handling of file flags.
 
 ### TODO
 - [ ] gzip source blocks (this involves writing out a version of the file that's compressed in block-increments)
-- [x] support variable length source blocks
-- [ ] Provide more helpers to make common usage easier (multi-threading etc)
 - [ ] Clean up naming consistency and clarity: Block / Chunk etc
 - [ ] Flesh out full directory build / sync
-- [ ] Implement 'patch' payloads from a known start point to a desired endstate
-- [x] Validate downloaded blocks
+- [ ] Implement 'patch' payloads from a known start point to a desired end state
 - [ ] Validate full file checksum after patching
 - [ ] Provide bandwidth limiting / monitoring as part of http blocksource
 - [ ] Think about turning the filechecksum into an interface
-- [ ] Avoid marshalling / unmarshalling blocks during checksum generation
+- [ ] Avoid marshalling / un-marshalling blocks during checksum generation
 - [ ] Sequential patcher to resume after error?
 
 ### Testing
 
+All tests are run by Travis-CI
+
 #### Unit tests
 
     go test github.com/Redundancy/go-sync/...
+
+#### Acceptance Tests
+See the "acceptancetests" folder. This is currently difficult to run locally and relies on several linux utilities.
 
 #### Commandline & files
 
@@ -78,3 +114,6 @@ Index generation:
 	gosync patch filenameToPatchFrom filenameToPatchTo.gosync filenameToPatchTo
 
 Note that normally, patching would rely on a remote http/https file source.
+
+#### Command line tool reference
+    gosync --help
