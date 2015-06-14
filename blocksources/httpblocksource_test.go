@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -45,21 +46,27 @@ func init() {
 	s.HandleFunc("/corrupt", corruptContentHandler)
 	s.Handle("/404", http.NotFoundHandler())
 
+	portChan := make(chan int)
+
 	go func() {
+		var listener net.Listener
+		var err error
+
 		for {
+			PORT++
 			p := fmt.Sprintf(":%v", PORT)
-			LOCAL_URL = "http://localhost" + p
+			listener, err = net.Listen("tcp", p)
 
-			err := http.ListenAndServe(
-				p,
-				s,
-			)
-
-			if err != nil {
-				PORT += 1
+			if err == nil {
+				break
 			}
 		}
+		portChan <- PORT
+		http.Serve(listener, s)
 	}()
+
+	p := fmt.Sprintf(":%v", <-portChan)
+	LOCAL_URL = "http://localhost" + p
 
 }
 
@@ -129,7 +136,7 @@ func TestHttpBlockSource404(t *testing.T) {
 	case e := <-b.EncounteredError():
 		if e == nil {
 			t.Fatal("Error was nil!")
-		} else if e != UrlNotFoundError {
+		} else if _, ok := e.(URLNotFoundError); !ok {
 			t.Errorf("Unexpected error type: %v", e)
 		}
 	case <-time.After(time.Second):

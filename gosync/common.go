@@ -25,30 +25,6 @@ const (
 	MB = 1000000
 )
 
-// FileSummary implements the FileSummary interface
-type FileSummary struct {
-	blockSize  uint
-	blockCount uint
-	fileSize   int64
-	*index.ChecksumIndex
-	filechecksum.ChecksumLookup
-}
-
-// Blocksize of the file
-func (fs *FileSummary) Blocksize() uint {
-	return fs.blockSize
-}
-
-// BlockCount of the file
-func (fs *FileSummary) BlockCount() uint {
-	return fs.blockCount
-}
-
-// Filesize of the file
-func (fs *FileSummary) Filesize() int64 {
-	return fs.fileSize
-}
-
 func errorWrapper(c *cli.Context, f func(*cli.Context) error) {
 	defer func() {
 		if p := recover(); p != nil {

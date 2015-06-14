@@ -3,8 +3,9 @@ package blocksources
 import (
 	"errors"
 	"fmt"
-	"github.com/Redundancy/go-sync/patcher"
 	"sort"
+
+	"github.com/Redundancy/go-sync/patcher"
 )
 
 // BlockSourceRequester does synchronous requests on a remote source of blocks
@@ -161,9 +162,19 @@ func (s *BlockSourceBase) loop() {
 			requestOrdering = append(requestOrdering, nextRequest.StartBlockID)
 			sort.Sort(sort.Reverse(requestOrdering))
 			go func() {
+				resolver := s.BlockSourceResolver
+
+				startOffset := resolver.GetBlockStartOffset(
+					nextRequest.StartBlockID,
+				)
+
+				endOffset := resolver.GetBlockEndOffset(
+					nextRequest.EndBlockID,
+				)
+
 				result, err := s.Requester.DoRequest(
-					s.BlockSourceResolver.GetBlockStartOffset(nextRequest.StartBlockID),
-					s.BlockSourceResolver.GetBlockEndOffset(nextRequest.EndBlockID),
+					startOffset,
+					endOffset,
 				)
 
 				resultChan <- asyncResult{

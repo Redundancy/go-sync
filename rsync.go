@@ -45,7 +45,6 @@ type RSync struct {
 	Source patcher.BlockSource
 	Output io.Writer
 
-	Index   comparer.Index
 	Summary FileSummary
 
 	OnClose []closer
@@ -157,7 +156,6 @@ func MakeRSync(
 		Input:   inputFile,
 		Output:  out,
 		Source:  source,
-		Index:   Summary,
 		Summary: Summary,
 		OnClose: []closer{
 			&fileCloser{inputFile, InputFile},
@@ -177,18 +175,13 @@ func (rsync *RSync) Patch() (err error) {
 	sectionSize += int64(blockSize) - (sectionSize % int64(blockSize))
 
 	merger := &comparer.MatchMerger{}
-	compare := &comparer.Comparer{}
 
 	for i := int64(0); i < numMatchers; i++ {
+		compare := &comparer.Comparer{}
 		offset := sectionSize * i
 
-		// Sections must overlap by blocksize (strictly blocksize - 1?)
-		if i > 0 {
-			offset -= int64(blockSize)
-		}
-
 		sectionReader := bufio.NewReaderSize(
-			io.NewSectionReader(rsync.Input, offset, sectionSize),
+			io.NewSectionReader(rsync.Input, offset, sectionSize+int64(blockSize)),
 			megabyte, // 1 MB buffer
 		)
 
@@ -198,7 +191,7 @@ func (rsync *RSync) Patch() (err error) {
 		)
 
 		matchStream := compare.StartFindMatchingBlocks(
-			sectionReader, offset, sectionGenerator, rsync.Index,
+			sectionReader, offset, sectionGenerator, rsync.Summary,
 		)
 
 		merger.StartMergeResultStream(matchStream, int64(blockSize))

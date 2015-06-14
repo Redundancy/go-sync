@@ -62,7 +62,6 @@ func Example() {
 			bytes.NewReader(referenceAsBytes),
 			blocksources.MakeNullFixedSizeResolver(uint64(blockSize)),
 		),
-		Index:   summary,
 		Summary: summary,
 		OnClose: nil,
 	}

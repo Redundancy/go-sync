@@ -1,9 +1,10 @@
 package comparer
 
 import (
-	"github.com/petar/GoLLRB/llrb"
 	"sort"
 	"sync"
+
+	"github.com/petar/GoLLRB/llrb"
 )
 
 // The result merger takes many BlockMatchResult

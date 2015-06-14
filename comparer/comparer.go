@@ -6,11 +6,12 @@ package comparer
 
 import (
 	"fmt"
+	"io"
+	"sync/atomic"
+
 	"github.com/Redundancy/go-sync/chunks"
 	"github.com/Redundancy/go-sync/circularbuffer"
 	"github.com/Redundancy/go-sync/filechecksum"
-	"io"
-	"sync/atomic"
 )
 
 const (

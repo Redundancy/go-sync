@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/Redundancy/go-sync/filechecksum"
 	"github.com/Redundancy/go-sync/indexbuilder"
 	"github.com/Redundancy/go-sync/patcher"
-	"github.com/Redundancy/go-sync/patcher/sequential"
 )
 
 // due to short example strings, use a very small block size
@@ -26,38 +26,43 @@ const REFERENCE = "The quick brown fox jumped over the lazy dog"
 const LOCAL_VERSION = "The qwik brown fox jumped 0v3r the lazy"
 
 var content = bytes.NewReader([]byte(REFERENCE))
-var LOCAL_URL = ""
-var PORT = 8000
 
 func handler(w http.ResponseWriter, req *http.Request) {
 	http.ServeContent(w, req, "", time.Now(), content)
 }
 
 // set up a http server locally that will respond predictably to ranged requests
-func setupServer() {
+func setupServer() <-chan int {
+	var PORT = 8000
 	s := http.NewServeMux()
 	s.HandleFunc("/content", handler)
 
+	portChan := make(chan int)
+
 	go func() {
+		var listener net.Listener
+		var err error
+
 		for {
+			PORT++
 			p := fmt.Sprintf(":%v", PORT)
-			LOCAL_URL = "http://localhost" + p
+			listener, err = net.Listen("tcp", p)
 
-			err := http.ListenAndServe(
-				p,
-				s,
-			)
-
-			if err != nil {
-				PORT++
+			if err == nil {
+				break
 			}
 		}
+		portChan <- PORT
+		http.Serve(listener, s)
 	}()
+
+	return portChan
 }
 
 // This is exceedingly similar to the module Example, but uses the http blocksource and a local http server
 func Example_httpBlockSource() {
-	setupServer()
+	PORT := <-setupServer()
+	LOCAL_URL := fmt.Sprintf("http://localhost:%v/content", PORT)
 
 	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
 	_, referenceFileIndex, checksumLookup, err := indexbuilder.BuildIndexFromString(generator, REFERENCE)
@@ -66,51 +71,76 @@ func Example_httpBlockSource() {
 		return
 	}
 
-	compare := &comparer.Comparer{}
+	fileSize := int64(len([]byte(REFERENCE)))
 
-	// This will result in a stream of blocks that match in the local version
-	// to those in the reference
-	// We could do this on two goroutines simultaneously, if we used two identical generators
-	matchStream := compare.StartFindMatchingBlocks(
-		bytes.NewBufferString(LOCAL_VERSION),
-		0,
-		generator,
-		referenceFileIndex,
+	// This would normally be saved in a file
+
+	blockCount := fileSize / BLOCK_SIZE
+	if fileSize%BLOCK_SIZE != 0 {
+		blockCount++
+	}
+
+	fs := &BasicSummary{
+		ChecksumIndex:  referenceFileIndex,
+		ChecksumLookup: checksumLookup,
+		BlockCount:     uint(blockCount),
+		BlockSize:      uint(BLOCK_SIZE),
+		FileSize:       fileSize,
+	}
+
+	/*
+		// Normally, this would be:
+		rsync, err := MakeRSync(
+			"toPatch.file",
+			"http://localhost/content",
+			"out.file",
+			fs,
+		)
+	*/
+	// Need to replace the output and the input
+	inputFile := bytes.NewReader([]byte(LOCAL_VERSION))
+	patchedFile := bytes.NewBuffer(nil)
+
+	resolver := blocksources.MakeFileSizedBlockResolver(
+		uint64(fs.GetBlockSize()),
+		fs.GetFileSize(),
 	)
 
-	merger := &comparer.MatchMerger{}
-	merger.StartMergeResultStream(matchStream, BLOCK_SIZE)
+	rsync := &RSync{
+		Input:  inputFile,
+		Output: patchedFile,
+		Source: blocksources.NewHttpBlockSource(
+			LOCAL_URL,
+			1,
+			resolver,
+			&filechecksum.HashVerifier{
+				Hash:                md5.New(),
+				BlockSize:           fs.GetBlockSize(),
+				BlockChecksumGetter: fs,
+			},
+		),
+		Summary: fs,
+		OnClose: nil,
+	}
 
-	matchingBlockRanges := merger.GetMergedBlocks()
-	missingBlockRanges := matchingBlockRanges.GetMissingBlocks(uint(referenceFileIndex.BlockCount) - 1)
-
-	patchedFile := bytes.NewBuffer(make([]byte, 0, len(REFERENCE)))
-	remoteReferenceSource := blocksources.NewHttpBlockSource(
-		LOCAL_URL+"/content",
-		2,
-		blocksources.MakeNullFixedSizeResolver(BLOCK_SIZE),
-		&filechecksum.HashVerifier{
-			Hash:                md5.New(),
-			BlockSize:           BLOCK_SIZE,
-			BlockChecksumGetter: checksumLookup,
-		},
-	)
-
-	err = sequential.SequentialPatcher(
-		bytes.NewReader([]byte(LOCAL_VERSION)),
-		remoteReferenceSource,
-		ToPatcherMissingSpan(missingBlockRanges, BLOCK_SIZE),
-		ToPatcherFoundSpan(matchingBlockRanges, BLOCK_SIZE),
-		1024,
-		patchedFile,
-	)
+	err = rsync.Patch()
 
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	err = rsync.Close()
+
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
 		return
 	}
 
 	fmt.Printf("Patched content: \"%v\"\n", patchedFile.String())
+
+	// Just for inspection
+	remoteReferenceSource := rsync.Source.(*blocksources.BlockSourceBase)
 	fmt.Printf("Downloaded Bytes: %v\n", remoteReferenceSource.ReadBytes())
 
 	// Output:

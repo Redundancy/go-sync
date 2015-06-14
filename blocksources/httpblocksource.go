@@ -11,7 +11,6 @@ import (
 const MB = 1024 * 1024
 
 var RangedRequestNotSupportedError = errors.New("Ranged request not supported (Server did not respond with 206 Status)")
-var UrlNotFoundError = errors.New("404 Error on URL")
 var ResponseFromServerWasGZiped = errors.New("HTTP response was gzip encoded. Ranges may not match those requested.")
 
 var ClientNoCompression = &http.Client{
@@ -36,6 +35,12 @@ func NewHttpBlockSource(
 	)
 }
 
+type URLNotFoundError string
+
+func (url URLNotFoundError) Error() string {
+	return "404 Error on URL: " + string(url)
+}
+
 // This class provides the implementation of BlockSourceRequester for BlockSourceBase
 // this simplifies creating new BlockSources that satisfy the requirements down to
 // writing a request function
@@ -48,7 +53,7 @@ func (r *HttpRequester) DoRequest(startOffset int64, endOffset int64) (data []by
 	rangedRequest, err := http.NewRequest("GET", r.url, nil)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error creating request for \"%v\": %v", r.url, err)
 	}
 
 	rangeSpecifier := fmt.Sprintf("bytes=%v-%v", startOffset, endOffset-1)
@@ -58,13 +63,13 @@ func (r *HttpRequester) DoRequest(startOffset int64, endOffset int64) (data []by
 	rangedResponse, err := r.client.Do(rangedRequest)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error executing request for \"%v\": %v", r.url, err)
 	}
 
 	defer rangedResponse.Body.Close()
 
 	if rangedResponse.StatusCode == 404 {
-		return nil, UrlNotFoundError
+		return nil, URLNotFoundError(r.url)
 	} else if rangedResponse.StatusCode != 206 {
 		return nil, RangedRequestNotSupportedError
 	} else if strings.Contains(

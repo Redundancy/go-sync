@@ -368,5 +368,34 @@ func TestNilBlockSpanList(t *testing.T) {
 	if missingItem.EndBlock != 1 {
 		t.Errorf("Wrong endblock: %v", missingItem.EndBlock)
 	}
+}
 
+func TestRegression1Merger(t *testing.T) {
+	const BLOCK_SIZE = 4
+	const ORIGINAL_STRING = "The quick brown fox jumped over the lazy dog"
+	const MODIFIED_STRING = "The qwik brown fox jumped 0v3r the lazy"
+
+	results, _ := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
+	merger := &MatchMerger{}
+	merger.StartMergeResultStream(results, BLOCK_SIZE)
+
+	merged := merger.GetMergedBlocks()
+	missing := merged.GetMissingBlocks(uint(len(ORIGINAL_STRING) / BLOCK_SIZE))
+
+	expected := []string{
+		"quic", "ed over ", " dog",
+	}
+
+	for i, v := range missing {
+		start := v.StartBlock * BLOCK_SIZE
+		end := (v.EndBlock + 1) * BLOCK_SIZE
+		if end > uint(len(ORIGINAL_STRING)) {
+			end = uint(len(ORIGINAL_STRING))
+		}
+		s := ORIGINAL_STRING[start:end]
+
+		if s != expected[i] {
+			t.Errorf("Wrong block %v: %v (expected %v)", i, expected[i])
+		}
+	}
 }

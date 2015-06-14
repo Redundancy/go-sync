@@ -1,11 +1,14 @@
 package comparer
 
 import (
+	"bufio"
 	"bytes"
-	"github.com/Redundancy/go-sync/filechecksum"
-	"github.com/Redundancy/go-sync/indexbuilder"
+	"io"
 	"reflect"
 	"testing"
+
+	"github.com/Redundancy/go-sync/filechecksum"
+	"github.com/Redundancy/go-sync/indexbuilder"
 )
 
 func CheckResults(
@@ -51,7 +54,7 @@ func CheckResults(
 
 	if len(resultStrings) != len(expectedResults) {
 		t.Fatalf(
-			"%v blocks should have matched, only got: %v",
+			"%#v blocks should have matched, got: %#v",
 			len(expectedResults),
 			resultStrings,
 		)
@@ -59,7 +62,7 @@ func CheckResults(
 
 	for i, v := range expectedResults {
 		if resultStrings[i] != v {
-			t.Errorf("%v != %v", resultStrings[i], v)
+			t.Errorf("%#v != %#v", resultStrings[i], v)
 		}
 	}
 }
@@ -344,4 +347,101 @@ func TestMultipleResultsForDuplicatedBlocks(t *testing.T) {
 		BLOCK_SIZE,
 		[]string{A, A},
 	)
+}
+
+func TestRegression1(t *testing.T) {
+	const BLOCK_SIZE = 4
+	var err error
+	const ORIGINAL_STRING = "The quick brown fox jumped over the lazy dog"
+	const MODIFIED_STRING = "The qwik brown fox jumped 0v3r the lazy"
+
+	results, err := compare(ORIGINAL_STRING, MODIFIED_STRING, BLOCK_SIZE)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	CheckResults(
+		t,
+		ORIGINAL_STRING,
+		MODIFIED_STRING,
+		results,
+		BLOCK_SIZE,
+		[]string{"The ", "k br", "own ", "fox ", "jump", "the ", "lazy"},
+	)
+}
+
+func TestTwoComparisons(t *testing.T) {
+	const BLOCK_SIZE = 4
+	const ORIGINAL_STRING = "The quick brown fox jumped over the lazy dog"
+	const MODIFIED_STRING = "The qwik brown fox jumped 0v3r the lazy"
+
+	numMatchers := int64(4)
+	sectionSize := int64(len(ORIGINAL_STRING)) / numMatchers
+	sectionSize += int64(BLOCK_SIZE) - (sectionSize % int64(BLOCK_SIZE))
+
+	merger := &MatchMerger{}
+
+	originalFile := bytes.NewReader([]byte(ORIGINAL_STRING))
+	modifiedFile := bytes.NewReader([]byte(MODIFIED_STRING))
+	generator := filechecksum.NewFileChecksumGenerator(BLOCK_SIZE)
+
+	_, reference, _, _ := indexbuilder.BuildChecksumIndex(
+		generator,
+		originalFile,
+	)
+
+	for i := int64(0); i < numMatchers; i++ {
+		compare := &Comparer{}
+		offset := sectionSize * i
+
+		t.Logf("Section %v: %v-%v", i, offset, offset+sectionSize)
+
+		sectionReader := bufio.NewReaderSize(
+			io.NewSectionReader(modifiedFile, offset, sectionSize+BLOCK_SIZE),
+			100000, // 1 MB buffer
+		)
+
+		// Bakes in the assumption about how to generate checksums (extract)
+		sectionGenerator := filechecksum.NewFileChecksumGenerator(
+			uint(BLOCK_SIZE),
+		)
+
+		matchStream := compare.StartFindMatchingBlocks(
+			sectionReader, offset, sectionGenerator, reference,
+		)
+
+		merger.StartMergeResultStream(matchStream, int64(BLOCK_SIZE))
+	}
+
+	merged := merger.GetMergedBlocks()
+	missing := merged.GetMissingBlocks(uint(len(ORIGINAL_STRING) / BLOCK_SIZE))
+
+	expected := []string{
+		"quic", "ed over ", " dog",
+	}
+
+	t.Logf("Missing blocks: %v", len(missing))
+
+	for x, v := range missing {
+		start := v.StartBlock * BLOCK_SIZE
+		end := (v.EndBlock + 1) * BLOCK_SIZE
+		if end > uint(len(ORIGINAL_STRING)) {
+			end = uint(len(ORIGINAL_STRING))
+		}
+		s := ORIGINAL_STRING[start:end]
+
+		if s != expected[x] {
+			t.Errorf(
+				"Wrong block %v (%v-%v): %#v (expected %#v)",
+				x, v.StartBlock, v.EndBlock, s, expected[x],
+			)
+		} else {
+			t.Logf(
+				"Correct block %v (%v-%v): %#v (expected %#v)",
+				x, v.StartBlock, v.EndBlock, s, expected[x],
+			)
+		}
+	}
+
+	t.Error("fail")
 }
