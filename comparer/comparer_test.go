@@ -442,6 +442,4 @@ func TestTwoComparisons(t *testing.T) {
 			)
 		}
 	}
-
-	t.Error("fail")
 }
