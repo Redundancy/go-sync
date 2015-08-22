@@ -15,8 +15,9 @@ import (
 // computing the strong checksum is not done when comparing unless the weak checksum matches
 type ChunkChecksum struct {
 	// an offset in terms of chunk count
-	// we don't know how big this is without knowing
-	ChunkOffset    uint
+	ChunkOffset uint
+	// the size of the block
+	Size           int64
 	WeakChecksum   []byte
 	StrongChecksum []byte
 }

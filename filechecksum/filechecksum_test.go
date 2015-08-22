@@ -2,13 +2,82 @@ package filechecksum
 
 import (
 	"bytes"
-	"github.com/Redundancy/go-sync/chunks"
-	"github.com/Redundancy/go-sync/index"
-	"github.com/Redundancy/go-sync/util/readers"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/Redundancy/go-sync/chunks"
+	"github.com/Redundancy/go-sync/index"
+	"github.com/Redundancy/go-sync/util/readers"
 )
+
+func TestChecksumGenerationEndsWithFilechecksum(t *testing.T) {
+	const BLOCKSIZE = 100
+	const BLOCK_COUNT = 20
+	emptybuffer := bytes.NewBuffer(make([]byte, BLOCK_COUNT*BLOCKSIZE))
+
+	checksum := NewFileChecksumGenerator(BLOCKSIZE)
+
+	lastResult := ChecksumResults{}
+
+	for lastResult = range checksum.StartChecksumGeneration(emptybuffer, 10, nil) {
+	}
+
+	if lastResult.Checksums != nil {
+		t.Errorf("Last result had checksums: %#v", lastResult)
+	}
+
+	if lastResult.Filechecksum == nil {
+		t.Errorf("Last result did not contain the filechecksum: %#v", lastResult)
+	}
+}
+
+func TestChecksumGenerationReturnsCorrectChecksumCount(t *testing.T) {
+	const BLOCKSIZE = 100
+	const BLOCK_COUNT = 20
+
+	emptybuffer := bytes.NewBuffer(make([]byte, BLOCK_COUNT*BLOCKSIZE))
+
+	checksum := NewFileChecksumGenerator(BLOCKSIZE)
+
+	resultCount := 0
+
+	for r := range checksum.StartChecksumGeneration(emptybuffer, 10, nil) {
+		resultCount += len(r.Checksums)
+	}
+
+	if resultCount != BLOCK_COUNT {
+		t.Errorf("Unexpected block count returned: %v", resultCount)
+	}
+}
+
+func TestChecksumGenerationContainsHashes(t *testing.T) {
+	const BLOCKSIZE = 100
+	const BLOCK_COUNT = 20
+
+	emptybuffer := bytes.NewBuffer(make([]byte, BLOCK_COUNT*BLOCKSIZE))
+	checksum := NewFileChecksumGenerator(BLOCKSIZE)
+
+	for r := range checksum.StartChecksumGeneration(emptybuffer, 10, nil) {
+		for _, r2 := range r.Checksums {
+			if len(r2.WeakChecksum) != checksum.WeakRollingHash.Size() {
+				t.Fatalf(
+					"Wrong length weak checksum: %v vs %v",
+					len(r2.WeakChecksum),
+					checksum.WeakRollingHash.Size(),
+				)
+			}
+
+			if len(r2.StrongChecksum) != checksum.StrongHash.Size() {
+				t.Fatalf(
+					"Wrong length strong checksum: %v vs %v",
+					len(r2.StrongChecksum),
+					checksum.StrongHash.Size(),
+				)
+			}
+		}
+	}
+}
 
 func TestRollsumLength(t *testing.T) {
 	const BLOCKSIZE = 100

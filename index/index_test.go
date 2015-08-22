@@ -1,19 +1,28 @@
 package index
 
 import (
-	"github.com/Redundancy/go-sync/chunks"
 	"testing"
+
+	"github.com/Redundancy/go-sync/chunks"
 )
 
 // Weak checksums must be 4 bytes
 var WEAK_A = []byte("aaaa")
 var WEAK_B = []byte("bbbb")
 
+/*
+ChunkOffset uint
+// the size of the block
+Size           int64
+WeakChecksum   []byte
+StrongChecksum []byte
+*/
+
 func TestMakeIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
 		},
 	)
 
@@ -25,9 +34,9 @@ func TestMakeIndex(t *testing.T) {
 func TestFindWeakInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("d")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("d")},
 		},
 	)
 
@@ -45,9 +54,9 @@ func TestFindWeakInIndex(t *testing.T) {
 func TestWeakNotInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("d")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("d")},
 		},
 	)
 
@@ -67,9 +76,9 @@ func TestWeakNotInIndex(t *testing.T) {
 func TestWeakNotInIndex2(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("d")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("d")},
 		},
 	)
 
@@ -83,9 +92,9 @@ func TestWeakNotInIndex2(t *testing.T) {
 func TestFindStrongInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("d")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("d")},
 		},
 	)
 
@@ -103,9 +112,9 @@ func TestFindStrongInIndex(t *testing.T) {
 func TestNotFoundStrongInIndexAtEnd(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("d")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("d")},
 		},
 	)
 
@@ -124,10 +133,10 @@ func TestNotFoundStrongInIndexInCenter(t *testing.T) {
 
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("d")},
-			{3, WEAK_B, []byte("f")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("d")},
+			{ChunkOffset: 3, WeakChecksum: WEAK_B, StrongChecksum: []byte("f")},
 		},
 	)
 
@@ -143,10 +152,10 @@ func TestNotFoundStrongInIndexInCenter(t *testing.T) {
 func TestFindDuplicatedBlocksInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{0, WEAK_A, []byte("b")},
-			{1, WEAK_B, []byte("c")},
-			{3, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("d")},
+			{ChunkOffset: 0, WeakChecksum: WEAK_A, StrongChecksum: []byte("b")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 3, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("d")},
 		},
 	)
 
@@ -172,8 +181,8 @@ func TestFindDuplicatedBlocksInIndex(t *testing.T) {
 func TestFindTwoDuplicatedBlocksInIndex(t *testing.T) {
 	i := MakeChecksumIndex(
 		[]chunks.ChunkChecksum{
-			{1, WEAK_B, []byte("c")},
-			{2, WEAK_B, []byte("c")},
+			{ChunkOffset: 1, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
+			{ChunkOffset: 2, WeakChecksum: WEAK_B, StrongChecksum: []byte("c")},
 		},
 	)
 

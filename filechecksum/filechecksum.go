@@ -8,9 +8,11 @@ package filechecksum
 
 import (
 	"crypto/md5"
-	"github.com/Redundancy/go-sync/rollsum"
 	"hash"
 	"io"
+
+	"github.com/Redundancy/go-sync/chunks"
+	"github.com/Redundancy/go-sync/rollsum"
 )
 
 // Rsync swapped to this after version 30
@@ -98,8 +100,55 @@ func (check *FileChecksumGenerator) GetStrongHash() hash.Hash {
 // to the output writer. It will return a checksum for the whole file.
 // Potentially speaking, this might be better producing a channel of blocks, which would remove the need for io from
 // a number of other places.
-// TODO: Make this output a channel of blocks, move the block loading / writing logic out
 func (check *FileChecksumGenerator) GenerateChecksums(inputFile io.Reader, output io.Writer) (fileChecksum []byte, err error) {
+	for chunkResult := range check.StartChecksumGeneration(inputFile, 64, nil) {
+		if chunkResult.Err != nil {
+			return nil, chunkResult.Err
+		} else if chunkResult.Filechecksum != nil {
+			return chunkResult.Filechecksum, nil
+		}
+
+		for _, chunk := range chunkResult.Checksums {
+			output.Write(chunk.WeakChecksum)
+			output.Write(chunk.StrongChecksum)
+		}
+	}
+
+	return nil, nil
+}
+
+type ChecksumResults struct {
+	// Return multiple chunks at once for performance
+	Checksums []chunks.ChunkChecksum
+	// only used for the last item
+	Filechecksum []byte
+	// signals that this is the last item
+	Err error
+}
+
+// A function or object that can compress blocks
+// the compression function must also write out the compressed blocks somewhere!
+// Compressed blocks should be independently inflatable
+type CompressionFunction func([]byte) (compressedSize int64, err error)
+
+func (check *FileChecksumGenerator) StartChecksumGeneration(
+	inputFile io.Reader,
+	blocksPerResult uint,
+	compressionFunction CompressionFunction,
+) <-chan ChecksumResults {
+	resultChan := make(chan ChecksumResults)
+	go check.generate(resultChan, blocksPerResult, compressionFunction, inputFile)
+	return resultChan
+}
+
+func (check *FileChecksumGenerator) generate(
+	resultChan chan ChecksumResults,
+	blocksPerResult uint,
+	compressionFunction CompressionFunction,
+	inputFile io.Reader,
+) {
+	defer close(resultChan)
+
 	fullChecksum := check.GetFileHash()
 	strongHash := check.GetStrongHash()
 
@@ -114,10 +163,9 @@ func (check *FileChecksumGenerator) GenerateChecksums(inputFile io.Reader, outpu
 	defer strongHash.Reset()
 	defer fullChecksum.Reset()
 
-	// ensure preallocated memory
-	strongChecksumValue := make([]byte, 0, strongHash.Size())
-	weakChecksumValue := make([]byte, check.WeakRollingHash.Size())
+	results := make([]chunks.ChunkChecksum, 0, blocksPerResult)
 
+	i := uint(0)
 	for {
 		n, err := io.ReadFull(inputFile, buffer)
 		section := buffer[:n]
@@ -133,11 +181,37 @@ func (check *FileChecksumGenerator) GenerateChecksums(inputFile io.Reader, outpu
 		check.WeakRollingHash.SetBlock(section)
 		strongHash.Write(section)
 
-		check.WeakRollingHash.GetSum(weakChecksumValue)
-		output.Write(weakChecksumValue)
+		strongChecksumValue := make([]byte, 0, strongHash.Size())
+		weakChecksumValue := make([]byte, check.WeakRollingHash.Size())
 
+		check.WeakRollingHash.GetSum(weakChecksumValue)
 		strongChecksumValue = strongHash.Sum(strongChecksumValue)
-		output.Write(strongChecksumValue)
+
+		blockSize := int64(check.BlockSize)
+
+		if compressionFunction != nil {
+			blockSize, err = compressionFunction(section)
+		}
+
+		results = append(
+			results,
+			chunks.ChunkChecksum{
+				ChunkOffset:    i,
+				Size:           blockSize,
+				WeakChecksum:   weakChecksumValue,
+				StrongChecksum: strongChecksumValue,
+			},
+		)
+
+		i++
+
+		if len(results) == cap(results) {
+			resultChan <- ChecksumResults{
+				Checksums: results,
+			}
+			results = make([]chunks.ChunkChecksum, 0, blocksPerResult)
+		}
+
 		// clear it again
 		strongChecksumValue = strongChecksumValue[:0]
 
@@ -149,5 +223,15 @@ func (check *FileChecksumGenerator) GenerateChecksums(inputFile io.Reader, outpu
 		}
 	}
 
-	return fullChecksum.Sum(nil), nil
+	if len(results) > 0 {
+		resultChan <- ChecksumResults{
+			Checksums: results,
+		}
+	}
+
+	resultChan <- ChecksumResults{
+		Filechecksum: fullChecksum.Sum(nil),
+	}
+
+	return
 }
