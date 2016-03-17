@@ -2,12 +2,6 @@ language: go
 go:
   - tip
 script:
-  - echo -e 'travis_fold:start:Build'
-  - go build  -o sync github.com/Redundancy/go-sync/gosync
-  - echo -e 'travis_fold:end:Build'
   - echo -e 'travis_fold:start:UnitTest'
   - go test -v github.com/Redundancy/go-sync/...
   - echo -e 'travis_fold:end:UnitTest'
-  - echo -e 'travis_fold:start:AcceptanceTest'
-  - sh $TRAVIS_BUILD_DIR/acceptancetests/run.sh
-  - echo -e 'travis_fold:end:AcceptanceTest'
