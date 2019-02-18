@@ -16,8 +16,7 @@ const (
 	ABSOLUTE_POSITION = 0
 )
 
-/*
-This simple example currently doesn't do any pipelining of needed blocks, nor does it deal with
+/* This simple example currently doesn't do any pipelining of needed blocks, nor does it deal with
 blocks being delivered out of order.
 */
 func SequentialPatcher(

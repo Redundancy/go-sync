@@ -84,13 +84,13 @@ func (check *FileChecksumGenerator) GetChecksumSizes() (int, int) {
 	return check.WeakRollingHash.Size(), check.GetStrongHash().Size()
 }
 
-// Gets the Hash function for the overall file used on each block
+// GetFileHash gets the Hash function for the overall file used on each block
 // defaults to md5
 func (check *FileChecksumGenerator) GetFileHash() hash.Hash {
 	return check.FileChecksumHash
 }
 
-// Gets the Hash function for the strong hash used on each block
+// GetStrongHash gets the Hash function for the strong hash used on each block
 // defaults to md5, but can be overriden by the generator
 func (check *FileChecksumGenerator) GetStrongHash() hash.Hash {
 	return check.StrongHash

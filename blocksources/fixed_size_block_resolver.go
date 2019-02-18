@@ -22,7 +22,7 @@ func (r *FixedSizeBlockResolver) GetBlockEndOffset(blockID uint) int64 {
 	}
 }
 
-// Split blocks into chunks of the desired size, or less. This implementation assumes a fixed block size at the source.
+// SplitBlockRangeToDesiredSize splits blocks into chunks of the desired size, or less. This implementation assumes a fixed block size at the source.
 func (r *FixedSizeBlockResolver) SplitBlockRangeToDesiredSize(startBlockID, endBlockID uint) []QueuedRequest {
 
 	if r.MaxDesiredRequestSize == 0 {
