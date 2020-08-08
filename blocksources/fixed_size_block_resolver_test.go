@@ -122,6 +122,6 @@ func TestThatFileSizeTruncatesBlockEnds(t *testing.T) {
 	result := res.GetBlockEndOffset(3)
 
 	if result != 13 {
-		t.Errorf("Unexpected BlockEnd Offset:", result)
+		t.Errorf("Unexpected BlockEnd Offset: %v", result)
 	}
 }

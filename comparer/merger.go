@@ -250,14 +250,14 @@ func (l BlockSpanList) Less(i, j int) bool {
 // Sorted list of blocks, based on StartBlock
 func (merger *MatchMerger) GetMergedBlocks() (sorted BlockSpanList) {
 	merger.wait.Wait()
-	var smallestKey uint = 0
+	// var smallestKey uint = 0
 	m := merger.startEndBlockMap
 
 	m.AscendGreaterOrEqual(m.Min(), func(item llrb.Item) bool {
 		switch block := item.(type) {
 		case BlockSpanStart:
 			sorted = append(sorted, BlockSpan(block))
-			smallestKey = block.StartBlock + 1
+			// smallestKey = block.StartBlock + 1
 		}
 		return true
 	})

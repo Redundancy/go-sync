@@ -395,7 +395,7 @@ func TestRegression1Merger(t *testing.T) {
 		s := ORIGINAL_STRING[start:end]
 
 		if s != expected[i] {
-			t.Errorf("Wrong block %v: %v (expected %v)", i, expected[i])
+			t.Errorf("Wrong block: %v (expected %v)", i, expected[i])
 		}
 	}
 }
