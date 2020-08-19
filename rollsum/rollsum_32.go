@@ -54,7 +54,7 @@ func (r *Rollsum32) BlockSize() int {
 	return int(r.blockSize)
 }
 
-// the number of bytes
+// The number of bytes
 func (r *Rollsum32) Size() int {
 	return 4
 }

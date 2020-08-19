@@ -107,7 +107,7 @@ func (c *C2) Truncate(byteCount int) (evicted []byte) {
 	return bufferToRead.buffer[start : start+byteCount]
 }
 
-// get the current buffer contents of block
+// GetBlock gets the current buffer contents of block
 func (c *C2) GetBlock() []byte {
 	// figure out which buffer has it stored contiguously
 	bufferToRead := c.getBlockBuffer()
@@ -116,7 +116,7 @@ func (c *C2) GetBlock() []byte {
 	return bufferToRead.buffer[start:bufferToRead.head]
 }
 
-// get the data that was evicted by the last write
+// Evicted gets the data that was evicted by the last write
 func (c *C2) Evicted() []byte {
 	if c.totalWritten <= c.blocksize {
 		return nil

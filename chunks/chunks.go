@@ -22,7 +22,7 @@ type ChunkChecksum struct {
 	StrongChecksum []byte
 }
 
-// compares a checksum to another based on the checksums, not the offset
+// Match compares a checksum to another based on the checksums, not the offset
 func (chunk ChunkChecksum) Match(other ChunkChecksum) bool {
 	weakEqual := bytes.Compare(chunk.WeakChecksum, other.WeakChecksum) == 0
 	strongEqual := false
